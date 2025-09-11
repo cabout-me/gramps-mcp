@@ -1,0 +1,40 @@
+[project]
+name = "gramps-mcp"
+version = "1.0.0"
+description = "AI-Powered Genealogy Research & Management - MCP server for Gramps Web API"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "httpx>=0.25.0",
+    "markdownify>=0.11.6",
+    "mcp>=1.2.0",
+    "pydantic>=2.0.0",
+    "pyjwt>=2.8.0",
+    "python-dotenv>=1.0.0",
+    "uvicorn>=0.23.0",
+]
+
+[tool.ruff]
+exclude = [
+    "examples/",
+    "venv/",
+    ".git/",
+    "__pycache__/",
+    "*.egg-info/",
+    ".venv/",
+    "tests/"
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "black>=23.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=4.3.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "requests>=2.31.0",
+    "ruff>=0.1.0",
+]

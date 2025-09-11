@@ -1,0 +1,9 @@
+venv
+venv_linux
+.venv
+.python-version
+__pycache__
+.ruff_cache
+.pytest_cache
+.env
+.claude/
