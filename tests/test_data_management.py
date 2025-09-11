@@ -368,7 +368,7 @@ class TestCreatePlaceTool:
         
         # Assert optional fields that were provided
         urls = re.findall(r'(https?://[^\s"\',]+)', text)
-        assert "https://www.boston.gov" in urls, f"Expected URL 'https://www.boston.gov' in output URLs {urls} but got: {text}"
+        assert any(url == "https://www.boston.gov" for url in urls), f"Expected exact URL 'https://www.boston.gov' in output URLs {urls} but got: {text}"
         assert "Official city website" in text, f"Expected URL description in output but got: {text}"
         
         # Extract place handle for use in subsequent tests
