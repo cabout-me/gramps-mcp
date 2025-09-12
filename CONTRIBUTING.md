@@ -141,13 +141,41 @@ GRAMPS_TREE_ID=your-tree-id
 
 ### Running the Server
 
+For development, you have several options:
+
 ```bash
+# Option 1: Use Docker with local build (recommended for development)
+docker-compose -f docker-compose.dev.yml up -d
+
+# Option 2: Run directly with uv (requires local setup)
 # HTTP transport (development)
 uv run python -m src.gramps_mcp.server
 
 # Stdio transport (testing)
 uv run python -m src.gramps_mcp.server stdio
 ```
+
+**Note**: The main `docker-compose.yml` uses pre-built images from GitHub Container Registry. For development with local code changes, use `docker-compose.dev.yml` which builds from your local source.
+
+## Image Registry
+
+Docker images are automatically published to GitHub Container Registry via GitHub Actions:
+
+- **Latest stable**: `ghcr.io/cabout-me/gramps-mcp:latest`
+- **Specific versions**: `ghcr.io/cabout-me/gramps-mcp:v1.0.0`
+- **Development**: `ghcr.io/cabout-me/gramps-mcp:main`
+
+Images are built for multiple architectures:
+- `linux/amd64` (Intel/AMD processors)
+- `linux/arm64` (ARM processors, including Apple Silicon)
+
+### Image Publishing
+
+Images are automatically built and published when:
+- **Push to main branch** → `ghcr.io/cabout-me/gramps-mcp:main`
+- **Release tags** → `ghcr.io/cabout-me/gramps-mcp:v1.2.3` and `ghcr.io/cabout-me/gramps-mcp:latest`
+
+The GitHub Actions workflow handles multi-architecture builds, proper tagging, and registry authentication automatically.
 
 ## Pull Request Process
 
