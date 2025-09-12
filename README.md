@@ -82,16 +82,16 @@ No more manual data entry, no context switching between apps, no generic genealo
    - Note your Gramps Web URL, username, and password
    - Find your tree ID under System Information in your Gramps Web interface
 
-2. **Clone and Configure**:
+2. **Start the Server**:
+
 ```bash
-git clone https://github.com/cabout/gramps-mcp.git
-cd gramps-mcp
+# Download the configuration
+curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/.env.example
 cp .env.example .env
 # Edit .env with your Gramps Web API credentials
-```
 
-3. **Start with Docker**:
-```bash
+# Start the server
 docker-compose up -d
 ```
 
@@ -139,7 +139,7 @@ GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
 
 Add to your Claude Desktop MCP configuration file (`claude_desktop_config.json`):
 
-**Using Docker** (recommended if using Docker setup):
+**Using Docker** (works with both pre-built and local images):
 ```json
 {
   "mcpServers": {
@@ -218,7 +218,7 @@ Add the MCP server to your OpenWebUI configuration:
 
 ### Claude Code
 
-**HTTP Transport** (requires running server):
+**HTTP Transport:**
 ```bash
 claude mcp add --transport http gramps http://localhost:8000/mcp
 ```
