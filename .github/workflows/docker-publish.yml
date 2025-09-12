@@ -60,10 +60,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Update repo description
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: meeDamian/sync-readme@v1.0.6
-        with:
-          pass: ${{ secrets.GITHUB_TOKEN }}
-          slug: ${{ github.repository }}
-          description: true
