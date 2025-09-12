@@ -166,54 +166,21 @@ Add to your Claude Desktop MCP configuration file (`claude_desktop_config.json`)
 
 ### OpenWebUI
 
-Add the MCP server to your OpenWebUI configuration:
+OpenWebUI recommends using the [mcpo proxy](https://docs.openwebui.com/openapi-servers/mcp/) to expose MCP servers as OpenAPI endpoints.
 
-**HTTP Transport:**
-```json
-{
-  "mcp": {
-    "servers": {
-      "gramps": {
-        "url": "http://localhost:8000/mcp",
-        "name": "Gramps Genealogy",
-        "description": "AI-powered genealogy research and family tree management"
-      }
-    }
-  }
-}
+**For stdio transport:**
+```bash
+uvx mcpo --port 8000 -- uv run python -m src.gramps_mcp.server stdio
 ```
 
-**Stdio Transport with Docker:**
-```json
-{
-  "mcp": {
-    "servers": {
-      "gramps": {
-        "command": "docker",
-        "args": ["exec", "-i", "gramps-mcp-gramps-mcp-1", "python", "-m", "src.gramps_mcp.server", "stdio"],
-        "name": "Gramps Genealogy",
-        "description": "AI-powered genealogy research and family tree management"
-      }
-    }
-  }
-}
+**For HTTP transport (when server is already running):**
+```bash
+uvx mcpo --port 8001 --proxy http://localhost:8000/mcp
 ```
 
-**Stdio Transport with uv:**
-```json
-{
-  "mcp": {
-    "servers": {
-      "gramps": {
-        "command": "uv",
-        "args": ["run", "python", "-m", "src.gramps_mcp.server", "stdio"],
-        "cwd": "/path/to/gramps-mcp",
-        "name": "Gramps Genealogy", 
-        "description": "AI-powered genealogy research and family tree management"
-      }
-    }
-  }
-}
+**With Docker:**
+```bash
+uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 python -m src.gramps_mcp.server stdio
 ```
 
 ### Claude Code
