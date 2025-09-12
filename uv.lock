@@ -262,6 +262,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "tdd-guard-pytest" },
 ]
 
 [package.metadata]
@@ -285,6 +286,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "ruff", specifier = ">=0.1.0" },
+    { name = "tdd-guard-pytest", specifier = ">=0.1.2" },
 ]
 
 [[package]]
@@ -1026,6 +1028,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/15/b9/cc3017f9a9c9b6e27c5106cc10cc7904653c3eec0729793aec10479dd669/starlette-0.47.3.tar.gz", hash = "sha256:6bc94f839cc176c4858894f1f8908f0ab79dfec1a6b8402f6da9be26ebea52e9", size = 2584144, upload-time = "2025-08-24T13:36:42.122Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/fd/901cfa59aaa5b30a99e16876f11abe38b59a1a2c51ffb3d7142bb6089069/starlette-0.47.3-py3-none-any.whl", hash = "sha256:89c0778ca62a76b826101e7c709e70680a1699ca7da6b44d38eb0a7e61fe4b51", size = 72991, upload-time = "2025-08-24T13:36:40.887Z" },
+]
+
+[[package]]
+name = "tdd-guard-pytest"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/82/204f333a4d9005d2b8bdd39108bd40542a342f7296451d332a48ccb32a5c/tdd_guard_pytest-0.1.2.tar.gz", hash = "sha256:5fafd89e0dac6140d7db46865d12c09075d0ed211b6aac7c300393994582be00", size = 8332, upload-time = "2025-07-28T08:33:43.63Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/c7/69e1e53cfc6e06776cfe633d806ac78f643fcf8474ec1bdbf6e374aeb214/tdd_guard_pytest-0.1.2-py3-none-any.whl", hash = "sha256:4ca9333315f859b841461c03760ff8fe5d3525ab2389230233e7ad594f90117e", size = 4427, upload-time = "2025-07-28T08:33:42.617Z" },
 ]
 
 [[package]]

@@ -241,7 +241,37 @@ class GrampsWebAPIClient:
                 if existing:
                     # Merge existing data with changes
                     merged_data = existing.copy()
-                    merged_data.update(json_data)
+                    
+                    # Merge all fields properly - lists get concatenated, others get replaced
+                    for key, value in json_data.items():
+                        if key.endswith("_list") and isinstance(value, list) and key in existing:
+                            existing_items = existing.get(key, [])
+                            
+                            # Smart deduplication based on list content type
+                            if existing_items and value:
+                                # Check if items are objects with 'ref' field (like event_ref_list, media_list)
+                                sample_existing = existing_items[0] if existing_items else None
+                                sample_new = value[0] if value else None
+                                
+                                if (isinstance(sample_existing, dict) and 'ref' in sample_existing and
+                                    isinstance(sample_new, dict) and 'ref' in sample_new):
+                                    # Deduplicate reference objects based on 'ref' field
+                                    existing_refs = {item.get('ref') for item in existing_items if isinstance(item, dict)}
+                                    new_items = [item for item in value if isinstance(item, dict) and item.get('ref') not in existing_refs]
+                                    merged_data[key] = existing_items + new_items
+                                elif isinstance(sample_existing, str) and isinstance(sample_new, str):
+                                    # Deduplicate simple string handles
+                                    existing_set = set(existing_items)
+                                    new_items = [item for item in value if item not in existing_set]
+                                    merged_data[key] = existing_items + new_items
+                                else:
+                                    # Fallback: simple concatenation for mixed/unknown types
+                                    merged_data[key] = existing_items + value
+                            else:
+                                # If either list is empty, just concatenate
+                                merged_data[key] = existing_items + value
+                        else:
+                            merged_data[key] = value
                     json_data = merged_data
 
         # Make the API request

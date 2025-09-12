@@ -511,6 +511,182 @@ class TestCreatePersonTool:
             pytest.fail("Could not extract person handle for chaining tests")
 
     @pytest.mark.asyncio
+    async def test_update_person_with_event_reference(self):
+        """Test updating an existing person with a new event reference - Issue #9."""
+        import re
+        
+        # Step 1: Create a standalone test person
+        person_result = await create_person_tool(
+            {
+                "primary_name": {
+                    "first_name": "TestUpdate",
+                    "surname_list": [
+                        {
+                            "surname": "PersonIssue9",
+                            "primary": True
+                        }
+                    ]
+                },
+                "gender": 1  # Male
+            }
+        )
+        
+        print("\n--- CREATE TEST PERSON ---")
+        print(person_result[0].text)
+        print("--- END ---\n")
+        
+        # Extract person handle
+        person_handle_match = re.search(r"\[([a-f0-9]+)\]", person_result[0].text)
+        if not person_handle_match:
+            pytest.fail("Could not extract person handle")
+        person_handle = person_handle_match.group(1)
+        
+        # Step 2: Create a simple note for our citation
+        note_result = await create_note_tool(
+            {
+                "text": "Test note for Issue #9 update test",
+                "type": "General"
+            }
+        )
+        note_handle_match = re.search(r"\[([a-f0-9]+)\]", note_result[0].text)
+        note_handle = note_handle_match.group(1) if note_handle_match else None
+        
+        # Step 3: Create a simple source
+        source_result = await create_source_tool(
+            {
+                "title": "Test Source for Issue 9"
+            }
+        )
+        source_handle_match = re.search(r"\[([a-f0-9]+)\]", source_result[0].text)
+        if not source_handle_match:
+            pytest.fail("Could not extract source handle")
+        source_handle = source_handle_match.group(1)
+        
+        # Step 4: Create a citation
+        citation_result = await create_citation_tool(
+            {
+                "source_handle": source_handle,
+                "page": "Test Page"
+            }
+        )
+        citation_handle_match = re.search(r"\[([a-f0-9]+)\]", citation_result[0].text)
+        if not citation_handle_match:
+            pytest.fail("Could not extract citation handle")
+        citation_handle = citation_handle_match.group(1)
+        
+        # Step 5: Create first event (Birth)
+        birth_event_result = await create_event_tool(
+            {
+                "type": "Birth",
+                "citation_list": [citation_handle],
+                "date": {
+                    "dateval": [1, 1, 1900, False],
+                    "quality": 0,
+                    "modifier": 0
+                }
+            }
+        )
+        
+        print("\n--- CREATE BIRTH EVENT ---")
+        print(birth_event_result[0].text)
+        print("--- END ---\n")
+        
+        birth_event_handle_match = re.search(r"\[([a-f0-9]+)\]", birth_event_result[0].text)
+        if not birth_event_handle_match:
+            pytest.fail("Could not extract birth event handle")
+        birth_event_handle = birth_event_handle_match.group(1)
+        
+        # Step 6: Update person with first event
+        first_update_result = await create_person_tool(
+            {
+                "handle": person_handle,
+                "primary_name": {
+                    "first_name": "TestUpdate",
+                    "surname_list": [
+                        {
+                            "surname": "PersonIssue9",
+                            "primary": True
+                        }
+                    ]
+                },
+                "gender": 1,
+                "event_ref_list": [
+                    {
+                        "ref": birth_event_handle,
+                        "role": "Primary"
+                    }
+                ]
+            }
+        )
+        
+        print("\n--- UPDATE PERSON WITH BIRTH EVENT ---")
+        print(first_update_result[0].text)
+        print("--- END ---\n")
+        
+        # Step 7: Create second event (Death)
+        death_event_result = await create_event_tool(
+            {
+                "type": "Death",
+                "citation_list": [citation_handle],
+                "date": {
+                    "dateval": [31, 12, 1999, False],
+                    "quality": 0,
+                    "modifier": 0
+                }
+            }
+        )
+        
+        print("\n--- CREATE DEATH EVENT ---")
+        print(death_event_result[0].text)
+        print("--- END ---\n")
+        
+        death_event_handle_match = re.search(r"\[([a-f0-9]+)\]", death_event_result[0].text)
+        if not death_event_handle_match:
+            pytest.fail("Could not extract death event handle")
+        death_event_handle = death_event_handle_match.group(1)
+        
+        # Step 8: Now update the person with BOTH events - this is the exact scenario from issue #9
+        # The person already has the birth event, and we're adding the death event
+        update_result = await create_person_tool(
+            {
+                "handle": person_handle,
+                "primary_name": {
+                    "first_name": "TestUpdate",
+                    "surname_list": [
+                        {
+                            "surname": "PersonIssue9",
+                            "primary": True
+                        }
+                    ]
+                },
+                "gender": 1,
+                "event_ref_list": [
+                    {
+                        "ref": birth_event_handle,
+                        "role": "Primary"
+                    },
+                    {
+                        "ref": death_event_handle,
+                        "role": "Primary"
+                    }
+                ]
+            }
+        )
+        
+        print("\n--- UPDATE PERSON WITH BOTH EVENTS (Issue #9 scenario) ---")
+        print(update_result[0].text)
+        print("--- END ---\n")
+        
+        text = update_result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "successfully" in text.lower()
+        assert "updated" in text.lower(), f"Expected 'updated' in output but got: {text}"
+        
+        # Verify both events are now linked to the person
+        assert "Birth" in text, f"Expected Birth event in output but got: {text}"
+        assert "Death" in text, f"Expected Death event in output but got: {text}"
+
+    @pytest.mark.asyncio
     async def test_create_second_person_success(self):
         """Test creation of second person for family test."""
         global test_person_handles, test_media_handle, test_note_handle
