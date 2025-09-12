@@ -1,6 +1,6 @@
 [project]
 name = "gramps-mcp"
-version = "1.0.0"
+version = "1.1.0"
 description = "AI-Powered Genealogy Research & Management - MCP server for Gramps Web API"
 requires-python = ">=3.10"
 dependencies = [
