@@ -60,15 +60,4 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Make package public
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        run: |
-          gh api \
-            --method PATCH \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            /orgs/${{ github.repository_owner }}/packages/container/$(echo ${{ env.IMAGE_NAME }} | cut -d'/' -f2) \
-            -f visibility=public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
