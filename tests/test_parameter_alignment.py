@@ -5,6 +5,8 @@ Verifies that POST/PUT parameters in models match exactly with the requirements
 specified in gramps-usage-guide.md - no more, no less, with correct required/optional status.
 """
 
+import pytest
+from pydantic import ValidationError
 from src.gramps_mcp.models.parameters.citation_params import CitationData
 from src.gramps_mcp.models.parameters.event_params import EventSaveParams
 from src.gramps_mcp.models.parameters.family_params import FamilySaveParams
@@ -316,3 +318,41 @@ class TestParameterAlignment:
         get_types = {e.value for e in GetEntityType}
         expected_get_types = {'person', 'family'}
         assert get_types == expected_get_types, f"GetEntityType should only have person and family"
+    
+    def test_person_event_reference_validation(self):
+        """Test that PersonData properly validates event_ref_list structure."""
+        # Test valid event reference format
+        valid_data = {
+            "primary_name": {"first_name": "Test", "surname_list": [{"surname": "Person"}]},
+            "gender": 1,
+            "event_ref_list": [
+                {
+                    "ref": "abc123def456",
+                    "role": "Primary"  # Should be string, not object
+                }
+            ]
+        }
+        
+        # This should work with proper validation
+        person = PersonData(**valid_data)
+        assert person.event_ref_list[0].ref == "abc123def456"
+        assert person.event_ref_list[0].role == "Primary"
+        
+        # Test the incorrect format that caused Issue #9
+        incorrect_data = {
+            "primary_name": {"first_name": "Test", "surname_list": [{"surname": "Person"}]},
+            "gender": 1,
+            "event_ref_list": [
+                {
+                    "ref": "abc123def456",
+                    "role": {"string": "Primary"}  # This incorrect format should be caught
+                }
+            ]
+        }
+        
+        # With proper validation, this should raise ValidationError
+        with pytest.raises(ValidationError) as exc_info:
+            PersonData(**incorrect_data)
+        
+        # The error should mention that role should be a string
+        assert "role" in str(exc_info.value).lower()

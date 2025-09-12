@@ -18,6 +18,13 @@ from pydantic import BaseModel, Field
 from .base_params import BaseDataModel
 
 
+class EventReference(BaseModel):
+    """Model for event references in a person's event_ref_list."""
+    
+    ref: str = Field(..., description="The handle of the event referenced")
+    role: str = Field(..., description="Role of the person in the event")
+
+
 class PersonData(BaseDataModel):
     """Model for creating or updating a person in Gramps API."""
 
@@ -27,7 +34,7 @@ class PersonData(BaseDataModel):
     gender: int = Field(
         ..., ge=0, le=2, description="Gender (0=Female, 1=Male, 2=Unknown)"
     )
-    event_ref_list: Optional[List[Dict[str, Any]]] = Field(
+    event_ref_list: Optional[List[EventReference]] = Field(
         None, description="List of references to events the person participated in"
     )
     family_list: Optional[List[str]] = Field(
