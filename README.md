@@ -168,19 +168,14 @@ Add to your Claude Desktop MCP configuration file (`claude_desktop_config.json`)
 
 OpenWebUI recommends using the [mcpo proxy](https://docs.openwebui.com/openapi-servers/mcp/) to expose MCP servers as OpenAPI endpoints.
 
-**For stdio transport:**
+**With uv:**
 ```bash
 uvx mcpo --port 8000 -- uv run python -m src.gramps_mcp.server stdio
 ```
 
-**For HTTP transport (when server is already running):**
-```bash
-uvx mcpo --port 8001 --proxy http://localhost:8000/mcp
-```
-
 **With Docker:**
 ```bash
-uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 python -m src.gramps_mcp.server stdio
+uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 uv run python -m src.gramps_mcp.server stdio
 ```
 
 ### Claude Code
