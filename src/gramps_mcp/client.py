@@ -1,3 +1,19 @@
+# gramps-mcp - AI-Powered Genealogy Research & Management
+# Copyright (C) 2025 cabout.me
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Unified Gramps Web API client.
 
@@ -241,31 +257,59 @@ class GrampsWebAPIClient:
                 if existing:
                     # Merge existing data with changes
                     merged_data = existing.copy()
-                    
-                    # Merge all fields properly - lists get concatenated, others get replaced
+
+                    # Merge all fields properly - lists get concatenated,
+                    # others get replaced
                     for key, value in json_data.items():
-                        if key.endswith("_list") and isinstance(value, list) and key in existing:
+                        if (
+                            key.endswith("_list")
+                            and isinstance(value, list)
+                            and key in existing
+                        ):
                             existing_items = existing.get(key, [])
-                            
+
                             # Smart deduplication based on list content type
                             if existing_items and value:
-                                # Check if items are objects with 'ref' field (like event_ref_list, media_list)
-                                sample_existing = existing_items[0] if existing_items else None
+                                # Check if items are objects with 'ref' field
+                                # (like event_ref_list, media_list)
+                                sample_existing = (
+                                    existing_items[0] if existing_items else None
+                                )
                                 sample_new = value[0] if value else None
-                                
-                                if (isinstance(sample_existing, dict) and 'ref' in sample_existing and
-                                    isinstance(sample_new, dict) and 'ref' in sample_new):
+
+                                if (
+                                    isinstance(sample_existing, dict)
+                                    and "ref" in sample_existing
+                                    and isinstance(sample_new, dict)
+                                    and "ref" in sample_new
+                                ):
                                     # Deduplicate reference objects based on 'ref' field
-                                    existing_refs = {item.get('ref') for item in existing_items if isinstance(item, dict)}
-                                    new_items = [item for item in value if isinstance(item, dict) and item.get('ref') not in existing_refs]
+                                    existing_refs = {
+                                        item.get("ref")
+                                        for item in existing_items
+                                        if isinstance(item, dict)
+                                    }
+                                    new_items = [
+                                        item
+                                        for item in value
+                                        if isinstance(item, dict)
+                                        and item.get("ref") not in existing_refs
+                                    ]
                                     merged_data[key] = existing_items + new_items
-                                elif isinstance(sample_existing, str) and isinstance(sample_new, str):
+                                elif isinstance(sample_existing, str) and isinstance(
+                                    sample_new, str
+                                ):
                                     # Deduplicate simple string handles
                                     existing_set = set(existing_items)
-                                    new_items = [item for item in value if item not in existing_set]
+                                    new_items = [
+                                        item
+                                        for item in value
+                                        if item not in existing_set
+                                    ]
                                     merged_data[key] = existing_items + new_items
                                 else:
-                                    # Fallback: simple concatenation for mixed/unknown types
+                                    # Fallback: simple concatenation for
+                                    # mixed/unknown types
                                     merged_data[key] = existing_items + value
                             else:
                                 # If either list is empty, just concatenate

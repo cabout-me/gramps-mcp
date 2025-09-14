@@ -8,6 +8,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: add-copyright-notice
+        name: Add copyright notice to Python files
+        entry: python scripts/add_copyright_notice.py
+        language: system
+        files: \.py$
+        exclude: ^(tests/|examples/)
+        pass_filenames: true
       - id: check-file-length
         name: Check file length (max 500 lines)
         entry: python scripts/check_file_length.py

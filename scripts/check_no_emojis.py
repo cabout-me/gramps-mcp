@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+# gramps-mcp - AI-Powered Genealogy Research & Management
+# Copyright (C) 2025 cabout.me
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Pre-commit hook to check for emojis in files.
 Prevents emojis from being committed to maintain clean, professional code.
@@ -23,24 +39,26 @@ def has_emojis(text: str) -> bool:
         # Check for emoji using Unicode categories and properties
         category = unicodedata.category(char)
         name = unicodedata.name(char, "")
-        
+
         # Emoji symbols are typically in category 'So' (Other symbols)
         # or have 'EMOJI' in their Unicode name
-        if category == 'So' and ('EMOJI' in name or 'FACE' in name or 'HAND' in name):
+        if category == "So" and ("EMOJI" in name or "FACE" in name or "HAND" in name):
             return True
-            
+
         # Check for common emoji ranges by code point
         code_point = ord(char)
-        if (0x1F600 <= code_point <= 0x1F64F or  # Emoticons
-            0x1F300 <= code_point <= 0x1F5FF or  # Misc symbols and pictographs
-            0x1F680 <= code_point <= 0x1F6FF or  # Transport and map symbols
-            0x1F1E0 <= code_point <= 0x1F1FF or  # Flags
-            0x2600 <= code_point <= 0x26FF or   # Misc symbols
-            0x2700 <= code_point <= 0x27BF or   # Dingbats
-            0x1F900 <= code_point <= 0x1F9FF or  # Supplemental symbols
-            0x1FA70 <= code_point <= 0x1FAFF):   # Extended pictographs
+        if (
+            0x1F600 <= code_point <= 0x1F64F  # Emoticons
+            or 0x1F300 <= code_point <= 0x1F5FF  # Misc symbols and pictographs
+            or 0x1F680 <= code_point <= 0x1F6FF  # Transport and map symbols
+            or 0x1F1E0 <= code_point <= 0x1F1FF  # Flags
+            or 0x2600 <= code_point <= 0x26FF  # Misc symbols
+            or 0x2700 <= code_point <= 0x27BF  # Dingbats
+            or 0x1F900 <= code_point <= 0x1F9FF  # Supplemental symbols
+            or 0x1FA70 <= code_point <= 0x1FAFF
+        ):  # Extended pictographs
             return True
-            
+
     return False
 
 
