@@ -22,10 +22,11 @@ all 23 genealogy tools for Gramps Web API integration.
 """
 
 import asyncio
+import inspect
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, get_args, get_origin
 
 from mcp.server import Server
 from mcp.server.fastmcp import FastMCP
@@ -222,20 +223,51 @@ app = FastMCP("gramps", stateless_http=True, json_response=True)
 
 # Register all tools dynamically from the registry
 def register_tools():
-    """Register all tools from the registry with FastMCP."""
+    """Register all tools from the registry with FastMCP.
+
+    Builds a flat function signature from each Pydantic model so that
+    FastMCP exposes every field as a top-level tool parameter instead of
+    nesting them under an ``arguments`` wrapper.
+    """
     for tool_name, tool_config in TOOL_REGISTRY.items():
         schema = tool_config["schema"]
         handler_func = tool_config["handler"]
         description = tool_config["description"]
 
-        # Create the async handler function with proper schema annotation
-        async def create_handler(arguments, handler=handler_func):
-            return await handler(arguments.model_dump())
+        # Build inspect.Parameter list from Pydantic model fields
+        params = []
+        annotations = {}
+        for field_name, field_info in schema.model_fields.items():
+            has_default = (
+                field_info.default is not None
+                or field_info.default_factory is not None
+                or not field_info.is_required()
+            )
+            default = (
+                field_info.default
+                if has_default
+                else inspect.Parameter.empty
+            )
+            params.append(
+                inspect.Parameter(
+                    field_name,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    default=default,
+                )
+            )
+            annotations[field_name] = field_info.annotation
 
-        # Set proper metadata
+        async def create_handler(
+            *args, handler=handler_func, model=schema, **kwargs
+        ):
+            validated = model(**kwargs)
+            return await handler(validated.model_dump())
+
+        # Set proper metadata so FastMCP generates a flat schema
         create_handler.__name__ = tool_name
         create_handler.__doc__ = description
-        create_handler.__annotations__ = {"arguments": schema}
+        create_handler.__annotations__ = annotations
+        create_handler.__signature__ = inspect.Signature(params)
 
         # Register with FastMCP
         app.tool(description=description)(create_handler)
