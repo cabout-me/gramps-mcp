@@ -74,3 +74,35 @@ class MediaSaveParams(BaseModel):
             "1=before, 2=after, 3=about, 4=range, 5=span, 6=textonly, 7=from, 8=to)"
         ),
     )
+
+
+class MediaFileUploadParams(BaseModel):
+    """Parameters for uploading a media file from local filesystem."""
+
+    file_path: str = Field(
+        ...,
+        description=(
+            "Absolute path to the file on the local filesystem "
+            "(e.g., '/home/user/photos/grandma.jpg' or 'C:\\Photos\\grandma.jpg')"
+        ),
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Optional description for the media item (used when creating new)",
+    )
+
+
+class MediaFileUpdateParams(BaseModel):
+    """Parameters for updating an existing media object's file."""
+
+    handle: str = Field(
+        ...,
+        description="Handle of the existing media object to update",
+    )
+    file_path: str = Field(
+        ...,
+        description=(
+            "Absolute path to the new file on the local filesystem "
+            "(e.g., '/home/user/photos/grandma_updated.jpg')"
+        ),
+    )

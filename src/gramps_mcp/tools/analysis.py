@@ -38,6 +38,15 @@ from .search_basic import with_client
 logger = logging.getLogger(__name__)
 
 
+def _get_arg(arguments, key, default=None):
+    """Get argument value from either dict or BaseModel."""
+    from pydantic import BaseModel
+
+    if isinstance(arguments, BaseModel):
+        return getattr(arguments, key, default)
+    return arguments.get(key, default)
+
+
 def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
@@ -180,14 +189,14 @@ async def _wait_for_task_completion(
 
 
 @with_client
-async def get_descendants_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_descendants_tool(client, arguments) -> List[TextContent]:
     """
     Find all descendants of a person.
     """
     try:
-        # Extract arguments directly
-        gramps_id = arguments.get("gramps_id")
-        max_generations = arguments.get("max_generations")
+        # Extract arguments (handles both dict and BaseModel)
+        gramps_id = _get_arg(arguments, "gramps_id")
+        max_generations = _get_arg(arguments, "max_generations")
 
         if not gramps_id:
             raise ValueError("gramps_id is required")
@@ -273,14 +282,14 @@ async def get_descendants_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_ancestors_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_ancestors_tool(client, arguments) -> List[TextContent]:
     """
     Find all ancestors of a person.
     """
     try:
-        # Extract arguments directly
-        gramps_id = arguments.get("gramps_id")
-        max_generations = arguments.get("max_generations")
+        # Extract arguments (handles both dict and BaseModel)
+        gramps_id = _get_arg(arguments, "gramps_id")
+        max_generations = _get_arg(arguments, "max_generations")
 
         if not gramps_id:
             raise ValueError("gramps_id is required")
@@ -428,7 +437,59 @@ def _format_tree_info(tree_info: Dict) -> str:
 
 
 @with_client
-async def get_tree_info_tool(client, _arguments: Dict) -> List[TextContent]:
+async def get_relations_tool(client, arguments) -> List[TextContent]:
+    """
+    Find the relationship between two people.
+    """
+    try:
+        handle1 = _get_arg(arguments, "handle1")
+        handle2 = _get_arg(arguments, "handle2")
+
+        if not handle1 or not handle2:
+            raise ValueError("Both handle1 and handle2 are required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get relationship using the API
+        relations = await client.make_api_call(
+            api_call=ApiCalls.GET_RELATIONS,
+            params=None,
+            tree_id=tree_id,
+            handle1=handle1,
+            handle2=handle2,
+        )
+
+        if not relations:
+            return [TextContent(type="text", text="No relationship found between these two people.")]
+
+        # Format the relationship result
+        # API returns: {"distance_common_origin": N, "distance_common_other": M, "relationship_string": "..."}
+        result = "## Relationship Found\n\n"
+
+        if isinstance(relations, dict):
+            relationship = relations.get("relationship_string", "Unknown")
+            dist_origin = relations.get("distance_common_origin")
+            dist_other = relations.get("distance_common_other")
+
+            result += f"**Relationship:** {relationship}\n"
+
+            if dist_origin is not None and dist_other is not None:
+                total_distance = dist_origin + dist_other
+                result += f"**Total Distance:** {total_distance} generations\n"
+                result += f"  - From person 1 to common ancestor: {dist_origin}\n"
+                result += f"  - From common ancestor to person 2: {dist_other}\n"
+        else:
+            result += str(relations)
+
+        return [TextContent(type="text", text=result)]
+
+    except Exception as e:
+        return _format_error_response(e, "relationship lookup")
+
+
+@with_client
+async def get_tree_info_tool(client, _arguments) -> List[TextContent]:
     """
     Get information about a specific tree including statistics.
 
@@ -449,3 +510,436 @@ async def get_tree_info_tool(client, _arguments: Dict) -> List[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "tree information retrieval")
+
+
+# ============================================================================
+# Living Status Tools
+# ============================================================================
+
+
+@with_client
+async def get_living_tool(client, arguments) -> List[TextContent]:
+    """
+    Check if a person is considered living (for privacy purposes).
+    """
+    try:
+        handle = _get_arg(arguments, "handle")
+
+        if not handle:
+            raise ValueError("handle is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get living status
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_LIVING,
+            params=None,
+            tree_id=tree_id,
+            handle=handle,
+        )
+
+        # Format response
+        is_living = result.get("living", False) if isinstance(result, dict) else result
+        status = "LIVING" if is_living else "DECEASED"
+
+        return [
+            TextContent(
+                type="text",
+                text=f"**Living Status:** {status}\n\nHandle: `{handle}`",
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "living status check")
+
+
+# ============================================================================
+# Facts Tools
+# ============================================================================
+
+
+@with_client
+async def get_facts_tool(client, arguments) -> List[TextContent]:
+    """
+    Get computed facts and statistics about the family tree.
+    """
+    try:
+        from ..models.parameters.facts_params import FactsParams
+
+        # Extract only explicitly provided arguments (not defaults)
+        # to avoid sending extra params the API rejects
+        if isinstance(arguments, FactsParams):
+            # Get only user-provided values
+            params_dict = arguments.model_dump(exclude_unset=True)
+        elif isinstance(arguments, dict):
+            params_dict = {k: v for k, v in arguments.items() if v is not None}
+        else:
+            params_dict = {}
+
+        # Only create params if there are explicit values to send
+        params = FactsParams(**params_dict) if params_dict else None
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get facts
+        facts = await client.make_api_call(
+            api_call=ApiCalls.GET_FACTS,
+            params=params,
+            tree_id=tree_id,
+        )
+
+        # Format response
+        if not facts:
+            return [TextContent(type="text", text="No facts available.")]
+
+        result = "# Tree Facts\n\n"
+
+        if isinstance(facts, dict):
+            for key, value in facts.items():
+                if isinstance(value, dict):
+                    result += f"## {key.replace('_', ' ').title()}\n"
+                    for sub_key, sub_value in value.items():
+                        result += f"- **{sub_key}:** {sub_value}\n"
+                    result += "\n"
+                elif isinstance(value, list):
+                    result += f"## {key.replace('_', ' ').title()}\n"
+                    for item in value[:10]:  # Limit to first 10
+                        result += f"- {item}\n"
+                    result += "\n"
+                else:
+                    result += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+        else:
+            result += str(facts)
+
+        return [TextContent(type="text", text=result)]
+
+    except Exception as e:
+        return _format_error_response(e, "facts retrieval")
+
+
+# ============================================================================
+# Relations All Tool
+# ============================================================================
+
+
+@with_client
+async def get_relations_all_tool(client, arguments) -> List[TextContent]:
+    """
+    Find ALL possible relationship paths between two people.
+    """
+    try:
+        handle1 = _get_arg(arguments, "handle1")
+        handle2 = _get_arg(arguments, "handle2")
+
+        if not handle1 or not handle2:
+            raise ValueError("Both handle1 and handle2 are required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get all relationships
+        relations = await client.make_api_call(
+            api_call=ApiCalls.GET_RELATIONS_ALL,
+            params=None,
+            tree_id=tree_id,
+            handle1=handle1,
+            handle2=handle2,
+        )
+
+        if not relations:
+            return [
+                TextContent(
+                    type="text",
+                    text="No relationships found between these two people.",
+                )
+            ]
+
+        # Format all relationships
+        result = "## All Relationship Paths\n\n"
+
+        if isinstance(relations, list):
+            for i, rel in enumerate(relations, 1):
+                relationship = rel.get("relationship_string", "Unknown")
+                dist_origin = rel.get("distance_common_origin")
+                dist_other = rel.get("distance_common_other")
+
+                result += f"**Path {i}:** {relationship}\n"
+                if dist_origin is not None and dist_other is not None:
+                    result += f"  - Distance: {dist_origin + dist_other} generations\n"
+                result += "\n"
+        else:
+            result += str(relations)
+
+        return [TextContent(type="text", text=result)]
+
+    except Exception as e:
+        return _format_error_response(e, "all relationships lookup")
+
+
+# ============================================================================
+# Timeline Tools
+# ============================================================================
+
+
+@with_client
+async def get_people_timeline_tool(client, arguments) -> List[TextContent]:
+    """
+    Get a timeline of events for a group of people.
+    """
+    try:
+        from ..models.parameters.timeline_params import PeopleTimelineParams
+
+        # Extract only explicitly provided arguments (not defaults)
+        # to avoid sending extra params the API rejects
+        if isinstance(arguments, PeopleTimelineParams):
+            params_dict = arguments.model_dump(exclude_unset=True)
+        elif isinstance(arguments, dict):
+            params_dict = {k: v for k, v in arguments.items() if v is not None}
+        else:
+            params_dict = {}
+
+        # Only create params if there are explicit values to send
+        params = PeopleTimelineParams(**params_dict) if params_dict else None
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get timeline
+        timeline = await client.make_api_call(
+            api_call=ApiCalls.GET_TIMELINES_PEOPLE,
+            params=params,
+            tree_id=tree_id,
+        )
+
+        if not timeline:
+            return [TextContent(type="text", text="No timeline events found.")]
+
+        # Format timeline
+        result = "# People Timeline\n\n"
+
+        events = timeline if isinstance(timeline, list) else timeline.get("data", [])
+        for event in events[:50]:  # Limit output
+            # Date can be a string or dict depending on API version
+            date = event.get("date", "Unknown date")
+            if isinstance(date, dict):
+                date_str = date.get("sortval", date.get("text", "Unknown date"))
+            else:
+                date_str = str(date) if date else "Unknown date"
+
+            event_type = event.get("type", event.get("label", "Event"))
+            description = event.get("description", "")
+            age = event.get("age", "")
+
+            # Person info - the person field is a dict with name_display, etc.
+            person = event.get("person", {})
+            if isinstance(person, dict):
+                person_name = person.get("name_display", person.get("name", ""))
+            else:
+                person_name = ""
+
+            result += f"- **{date_str}** - {event_type}"
+            if description:
+                result += f": {description}"
+            if person_name:
+                result += f" ({person_name})"
+            if age:
+                result += f" [age: {age}]"
+            result += "\n"
+
+        return [TextContent(type="text", text=result)]
+
+    except Exception as e:
+        return _format_error_response(e, "people timeline retrieval")
+
+
+@with_client
+async def get_families_timeline_tool(client, arguments) -> List[TextContent]:
+    """
+    Get a timeline of events for a group of families.
+    """
+    try:
+        from ..models.parameters.timeline_params import FamiliesTimelineParams
+
+        # Extract only explicitly provided arguments (not defaults)
+        # to avoid sending extra params the API rejects
+        if isinstance(arguments, FamiliesTimelineParams):
+            params_dict = arguments.model_dump(exclude_unset=True)
+        elif isinstance(arguments, dict):
+            params_dict = {k: v for k, v in arguments.items() if v is not None}
+        else:
+            params_dict = {}
+
+        # Only create params if there are explicit values to send
+        params = FamiliesTimelineParams(**params_dict) if params_dict else None
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get timeline
+        timeline = await client.make_api_call(
+            api_call=ApiCalls.GET_TIMELINES_FAMILIES,
+            params=params,
+            tree_id=tree_id,
+        )
+
+        if not timeline:
+            return [TextContent(type="text", text="No family timeline events found.")]
+
+        # Format timeline
+        result = "# Families Timeline\n\n"
+
+        events = timeline if isinstance(timeline, list) else timeline.get("data", [])
+        for event in events[:50]:  # Limit output
+            # Date can be a string or dict depending on API version
+            date = event.get("date", "Unknown date")
+            if isinstance(date, dict):
+                date_str = date.get("sortval", date.get("text", "Unknown date"))
+            else:
+                date_str = str(date) if date else "Unknown date"
+
+            event_type = event.get("type", event.get("label", "Event"))
+            description = event.get("description", "")
+            age = event.get("age", "")
+
+            # Person info if available
+            person = event.get("person", {})
+            if isinstance(person, dict):
+                person_name = person.get("name_display", person.get("name", ""))
+            else:
+                person_name = ""
+
+            result += f"- **{date_str}** - {event_type}"
+            if description:
+                result += f": {description}"
+            if person_name:
+                result += f" ({person_name})"
+            if age:
+                result += f" [age: {age}]"
+            result += "\n"
+
+        return [TextContent(type="text", text=result)]
+
+    except Exception as e:
+        return _format_error_response(e, "families timeline retrieval")
+
+
+# ============================================================================
+# Event Span Tool
+# ============================================================================
+
+
+@with_client
+async def get_event_span_tool(client, arguments) -> List[TextContent]:
+    """
+    Calculate the time span between two events.
+
+    Useful for questions like "How old was X when Y happened?" or
+    "How long between marriage and first child?"
+    """
+    try:
+        handle1 = _get_arg(arguments, "handle1")
+        handle2 = _get_arg(arguments, "handle2")
+        precision = _get_arg(arguments, "precision", 2)
+        as_age = _get_arg(arguments, "as_age", True)
+
+        if not handle1 or not handle2:
+            raise ValueError("Both handle1 and handle2 are required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Build query params - only include if explicitly set to non-default values
+        params = {}
+        if precision is not None and precision != 2:
+            params["precision"] = precision
+        if as_age is not None and not as_age:
+            params["as_age"] = as_age
+
+        # Get event span
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_EVENT_SPAN,
+            params=params if params else None,
+            tree_id=tree_id,
+            handle1=handle1,
+            handle2=handle2,
+        )
+
+        span = result.get("span", "unknown") if isinstance(result, dict) else "unknown"
+
+        response = f"## Time Span Between Events\n\n"
+        response += f"**Event 1:** `{handle1}`\n"
+        response += f"**Event 2:** `{handle2}`\n"
+        response += f"**Span:** {span}\n"
+
+        if span == "unknown":
+            response += "\n*Note: Span could not be calculated. This usually means one or both events don't have complete dates.*"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "event span calculation")
+
+
+# ============================================================================
+# Types Reference Tool
+# ============================================================================
+
+
+@with_client
+async def get_types_tool(client, arguments) -> List[TextContent]:
+    """
+    Get all valid type values for Gramps records.
+
+    Returns valid values for event types, name types, place types,
+    note types, and more. Useful as a reference when creating records.
+    """
+    try:
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Get default types
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_TYPES_DEFAULT,
+            params=None,
+            tree_id=tree_id,
+        )
+
+        if not result:
+            return [TextContent(type="text", text="No type information available.")]
+
+        response = "# Gramps Type Reference\n\n"
+        response += "Valid values for each record type:\n\n"
+
+        # Format each type category
+        type_categories = [
+            ("event_types", "Event Types"),
+            ("name_types", "Name Types"),
+            ("place_types", "Place Types"),
+            ("note_types", "Note Types"),
+            ("family_relation_types", "Family Relation Types"),
+            ("gender_types", "Gender Types"),
+            ("repository_types", "Repository Types"),
+            ("source_media_types", "Source Media Types"),
+            ("name_origin_types", "Name Origin Types"),
+            ("event_role_types", "Event Role Types"),
+            ("child_reference_types", "Child Reference Types"),
+            ("attribute_types", "Attribute Types"),
+            ("url_types", "URL Types"),
+        ]
+
+        for key, label in type_categories:
+            if key in result:
+                values = result[key]
+                response += f"## {label}\n"
+                # Format as comma-separated list, max 8 per line
+                for i in range(0, len(values), 8):
+                    chunk = values[i:i+8]
+                    response += ", ".join(chunk) + "\n"
+                response += "\n"
+
+        return [TextContent(type="text", text=response)]
+
+    except Exception as e:
+        return _format_error_response(e, "types retrieval")

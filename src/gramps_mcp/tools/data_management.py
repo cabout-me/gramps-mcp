@@ -17,11 +17,13 @@
 """
 Data management MCP tools for genealogy operations.
 
-This module contains 8 CRUD tools for creating and updating people, families,
-events, places, sources, citations, notes, and media records.
+This module contains CRUD tools for creating and updating people, families,
+events, places, sources, citations, notes, media records, and file uploads.
 """
 
 import logging
+import mimetypes
+import os
 from typing import Dict, List
 
 from mcp.types import TextContent
@@ -84,13 +86,22 @@ def _extract_entity_data(result, entity_type: str = None):
     )
 
 
+def _validate_params(arguments, param_class):
+    """Validate parameters - skip if already a validated Pydantic model."""
+    from pydantic import BaseModel
+
+    if isinstance(arguments, BaseModel):
+        return arguments
+    return param_class(**arguments)
+
+
 async def _handle_crud_operation(
     params, entity_type: str, post_api_call, put_api_call, param_class
 ) -> List[TextContent]:
     """Common helper for create/update operations."""
     try:
-        # Validate parameters
-        validated_params = param_class(**params)
+        # Validate parameters - skip if already a validated Pydantic model
+        validated_params = _validate_params(params, param_class)
 
         # Get tree_id from settings
         settings = get_settings()
@@ -195,13 +206,13 @@ async def create_person_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_family_tool(arguments: Dict) -> List[TextContent]:
+async def create_family_tool(arguments) -> List[TextContent]:
     """
     Create or update family unit including member relationships.
     """
     try:
-        # Validate parameters
-        params = FamilySaveParams(**arguments)
+        # Validate parameters - handles both dict and BaseModel inputs
+        params = _validate_params(arguments, FamilySaveParams)
 
         # Get tree_id from settings
         settings = get_settings()
@@ -294,19 +305,27 @@ async def create_note_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_media_tool(arguments: Dict) -> List[TextContent]:
+async def create_media_tool(arguments) -> List[TextContent]:
     """
     Create or update media files including object associations.
     """
     import mimetypes
     import os
+    from pydantic import BaseModel
 
     try:
+        # Handle both dict and BaseModel inputs
+        if isinstance(arguments, BaseModel):
+            # Convert to dict for processing
+            args_dict = arguments.model_dump()
+        else:
+            args_dict = arguments
+
         # Extract file_location separately (not part of MediaSaveParams)
-        file_location = arguments.get("file_location")
+        file_location = args_dict.get("file_location")
 
         # All other arguments are for metadata
-        media_params = {k: v for k, v in arguments.items() if k != "file_location"}
+        media_params = {k: v for k, v in args_dict.items() if k != "file_location"}
         params = MediaSaveParams(**media_params) if media_params else None
 
         settings = get_settings()
@@ -380,31 +399,29 @@ async def create_media_tool(arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "media save")
 
 
-async def create_repository_tool(arguments: Dict) -> List[TextContent]:
+async def create_repository_tool(arguments) -> List[TextContent]:
     """
     Create or update repository information.
     """
     try:
-        # Let Pydantic model handle parameter validation
+        # Validate parameters - handles both dict and BaseModel inputs
+        params = _validate_params(arguments, RepositoryData)
 
         # Assert required parameters
-        if not arguments.get("name"):
+        if not params.name:
             return [
                 TextContent(
                     type="text",
                     text="Error: 'name' parameter is required for repository",
                 )
             ]
-        if not arguments.get("type"):
+        if not params.type:
             return [
                 TextContent(
                     type="text",
                     text="Error: 'type' parameter is required for repository",
                 )
             ]
-
-        # Validate parameters
-        params = RepositoryData(**arguments)
 
         # Get tree_id from settings
         settings = get_settings()
@@ -442,3 +459,602 @@ async def create_repository_tool(arguments: Dict) -> List[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "repository save")
+
+
+# ============================================================================
+# Delete Tools (2 tools)
+# ============================================================================
+
+
+async def delete_person_tool(arguments) -> List[TextContent]:
+    """Delete a person by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_PERSON,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted person with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "person delete")
+
+
+async def delete_family_tool(arguments) -> List[TextContent]:
+    """Delete a family by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_FAMILY,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted family with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "family delete")
+
+
+async def delete_event_tool(arguments) -> List[TextContent]:
+    """Delete an event by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_EVENT,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted event with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "event delete")
+
+
+async def delete_note_tool(arguments) -> List[TextContent]:
+    """Delete a note by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_NOTE,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted note with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "note delete")
+
+
+async def delete_citation_tool(arguments) -> List[TextContent]:
+    """Delete a citation by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_CITATION,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted citation with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "citation delete")
+
+
+async def delete_source_tool(arguments) -> List[TextContent]:
+    """Delete a source by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_SOURCE,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted source with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "source delete")
+
+
+async def delete_place_tool(arguments) -> List[TextContent]:
+    """Delete a place by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_PLACE,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted place with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "place delete")
+
+
+async def delete_repository_tool(arguments) -> List[TextContent]:
+    """Delete a repository by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_REPOSITORY,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted repository with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "repository delete")
+
+
+async def delete_media_tool(arguments) -> List[TextContent]:
+    """Delete a media item by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_MEDIA_ITEM,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted media with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "media delete")
+
+
+# ============================================================================
+# Tag Tools (CRUD)
+# ============================================================================
+
+
+async def find_tags_tool(arguments) -> List[TextContent]:
+    """Find/list all tags in the database."""
+    from ..models.parameters.tag_params import TagSearchParams
+
+    try:
+        params = _validate_params(arguments, TagSearchParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            tags = await client.make_api_call(
+                api_call=ApiCalls.GET_TAGS,
+                params=params,
+                tree_id=tree_id,
+            )
+
+            if not tags:
+                return [TextContent(type="text", text="No tags found.")]
+
+            result = f"Found {len(tags)} tags:\n\n"
+            for tag in tags:
+                name = tag.get("name", "Unnamed")
+                handle = tag.get("handle", "N/A")
+                color = tag.get("color", "")
+                priority = tag.get("priority", "")
+
+                result += f"- **{name}** [`{handle}`]"
+                if color:
+                    result += f" - Color: {color}"
+                if priority:
+                    result += f" - Priority: {priority}"
+                result += "\n"
+
+            return [TextContent(type="text", text=result)]
+
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "tags search")
+
+
+async def create_tag_tool(arguments) -> List[TextContent]:
+    """Create or update a tag."""
+    from ..models.parameters.tag_params import TagSaveParams
+
+    try:
+        params = _validate_params(arguments, TagSaveParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            if params.handle:
+                # Update existing tag
+                result = await client.make_api_call(
+                    api_call=ApiCalls.PUT_TAG,
+                    params=params,
+                    tree_id=tree_id,
+                    handle=params.handle,
+                )
+                operation = "updated"
+            else:
+                # Create new tag
+                result = await client.make_api_call(
+                    api_call=ApiCalls.POST_TAGS,
+                    params=params,
+                    tree_id=tree_id,
+                )
+                operation = "created"
+
+            # Extract tag data
+            if isinstance(result, list) and result:
+                tag_data = result[0].get("new", result[0])
+            else:
+                tag_data = result
+
+            name = tag_data.get("name", params.name)
+            handle = tag_data.get("handle", "N/A")
+
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully {operation} tag: **{name}** [`{handle}`]",
+                )
+            ]
+
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "tag save")
+
+
+async def delete_tag_tool(arguments) -> List[TextContent]:
+    """Delete a tag by handle."""
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_TAG,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully deleted tag with handle: {params.handle}",
+                )
+            ]
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "tag delete")
+
+
+# ============================================================================
+# Media File Tools
+# ============================================================================
+
+
+async def get_media_file_tool(arguments) -> List[TextContent]:
+    """
+    Get information about a media file (metadata and download URL).
+
+    Note: This returns file metadata. The actual file can be accessed
+    via the Gramps Web UI or API directly.
+    """
+    from ..models.parameters.delete_params import DeleteParams
+
+    try:
+        params = _validate_params(arguments, DeleteParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        client = GrampsWebAPIClient()
+        try:
+            # First get media metadata
+            media_info = await client.make_api_call(
+                api_call=ApiCalls.GET_MEDIA_ITEM,
+                params=None,
+                tree_id=tree_id,
+                handle=params.handle,
+            )
+
+            if not media_info:
+                return [
+                    TextContent(type="text", text=f"Media not found: {params.handle}")
+                ]
+
+            # Format response
+            gramps_id = media_info.get("gramps_id", "N/A")
+            desc = media_info.get("desc", "No description")
+            mime = media_info.get("mime", "Unknown")
+            path = media_info.get("path", "")
+            checksum = media_info.get("checksum", "")
+
+            result = f"## Media File: {gramps_id}\n\n"
+            result += f"**Description:** {desc}\n"
+            result += f"**MIME Type:** {mime}\n"
+            result += f"**Path:** {path}\n"
+            result += f"**Handle:** `{params.handle}`\n"
+            if checksum:
+                result += f"**Checksum:** {checksum}\n"
+
+            # Provide download URL hint
+            api_url = settings.gramps_api_url
+            result += f"\n**File URL:** `{api_url}/api/trees/{tree_id}/media/{params.handle}/file`\n"
+
+            return [TextContent(type="text", text=result)]
+
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "media file info")
+
+
+async def upload_media_file_tool(arguments) -> List[TextContent]:
+    """
+    Upload a new media file from the local filesystem.
+
+    Creates a new media object in Gramps with the uploaded file.
+    Supports common image formats (jpg, png, gif, etc.), PDFs, and other media.
+    """
+    from ..models.parameters.media_params import MediaFileUploadParams
+
+    try:
+        params = _validate_params(arguments, MediaFileUploadParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Validate file exists
+        if not os.path.isfile(params.file_path):
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error: File not found: {params.file_path}",
+                )
+            ]
+
+        # Read file content
+        with open(params.file_path, "rb") as f:
+            file_content = f.read()
+
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(params.file_path)
+        if not mime_type:
+            # Default to binary if unknown
+            mime_type = "application/octet-stream"
+
+        # Get file size for reporting
+        file_size = len(file_content)
+        file_name = os.path.basename(params.file_path)
+
+        client = GrampsWebAPIClient()
+        try:
+            result = await client.upload_media_file(
+                file_content=file_content,
+                mime_type=mime_type,
+                tree_id=tree_id,
+            )
+
+            # Extract created media info
+            if isinstance(result, list) and result:
+                media_data = result[0].get("new", result[0])
+            else:
+                media_data = result
+
+            handle = media_data.get("handle", "N/A")
+            gramps_id = media_data.get("gramps_id", "N/A")
+            checksum = media_data.get("checksum", "")
+
+            response = f"## Media File Uploaded Successfully\n\n"
+            response += f"**File:** {file_name}\n"
+            response += f"**Size:** {file_size:,} bytes\n"
+            response += f"**MIME Type:** {mime_type}\n"
+            response += f"**Gramps ID:** {gramps_id}\n"
+            response += f"**Handle:** `{handle}`\n"
+            if checksum:
+                response += f"**Checksum:** {checksum}\n"
+
+            if params.description:
+                response += f"\nNote: To add a description, use `create_media` with handle `{handle}`"
+
+            return [TextContent(type="text", text=response)]
+
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "media file upload")
+
+
+async def update_media_file_tool(arguments) -> List[TextContent]:
+    """
+    Update an existing media object's file from the local filesystem.
+
+    Replaces the file content of an existing media object.
+    The media object must already exist (use upload_media_file_tool to create new).
+    """
+    from ..models.parameters.media_params import MediaFileUpdateParams
+
+    try:
+        params = _validate_params(arguments, MediaFileUpdateParams)
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        # Validate file exists
+        if not os.path.isfile(params.file_path):
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error: File not found: {params.file_path}",
+                )
+            ]
+
+        # Read file content
+        with open(params.file_path, "rb") as f:
+            file_content = f.read()
+
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(params.file_path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        file_size = len(file_content)
+        file_name = os.path.basename(params.file_path)
+
+        client = GrampsWebAPIClient()
+        try:
+            result = await client.update_media_file(
+                handle=params.handle,
+                file_content=file_content,
+                mime_type=mime_type,
+                tree_id=tree_id,
+            )
+
+            # Extract updated media info
+            if isinstance(result, list) and result:
+                media_data = result[0].get("new", result[0])
+            else:
+                media_data = result
+
+            gramps_id = media_data.get("gramps_id", "N/A")
+            checksum = media_data.get("checksum", "")
+
+            response = f"## Media File Updated Successfully\n\n"
+            response += f"**File:** {file_name}\n"
+            response += f"**Size:** {file_size:,} bytes\n"
+            response += f"**MIME Type:** {mime_type}\n"
+            response += f"**Gramps ID:** {gramps_id}\n"
+            response += f"**Handle:** `{params.handle}`\n"
+            if checksum:
+                response += f"**New Checksum:** {checksum}\n"
+
+            return [TextContent(type="text", text=response)]
+
+        finally:
+            await client.close()
+    except Exception as e:
+        return _format_error_response(e, "media file update")

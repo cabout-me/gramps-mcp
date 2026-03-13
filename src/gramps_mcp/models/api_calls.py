@@ -112,8 +112,8 @@ class ApiCalls(Enum):
     GET_LIVING_DATES = ("GET", "living/{handle}/dates")
 
     # ANALYSIS operations - Timelines
-    GET_TIMELINES_PEOPLE = ("GET", "timelines/people")
-    GET_TIMELINES_FAMILIES = ("GET", "timelines/families")
+    GET_TIMELINES_PEOPLE = ("GET", "timelines/people/")
+    GET_TIMELINES_FAMILIES = ("GET", "timelines/families/")
 
     # ANALYSIS operations - Facts
     GET_FACTS = ("GET", "facts/")
@@ -124,9 +124,9 @@ class ApiCalls(Enum):
 
     # MANAGEMENT operations - Types
     GET_TYPES = ("GET", "types/")
-    GET_TYPES_DEFAULT = ("GET", "types/default")
-    GET_TYPES_DEFAULT_DATATYPE = ("GET", "types/default/{datatype}")
-    GET_TYPES_DEFAULT_MAP = ("GET", "types/default/{datatype}/map")
+    GET_TYPES_DEFAULT = ("GET", "types/default/")
+    GET_TYPES_DEFAULT_DATATYPE = ("GET", "types/default/{datatype}/")
+    GET_TYPES_DEFAULT_MAP = ("GET", "types/default/{datatype}/map/")
 
     # REPORTS operations
     GET_REPORTS = ("GET", "reports/")

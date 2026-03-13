@@ -26,9 +26,20 @@ API calls supported in this category:
 - GET_FAMILY_TIMELINE: Get the timeline for all the people in a specific family
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
+
+
+class ChildReference(BaseModel):
+    """Model for child references in a family's child_ref_list."""
+
+    ref: str = Field(..., description="The handle of the child person")
+    frel: str = Field(default="Birth", description="Father relationship type")
+    mrel: str = Field(default="Birth", description="Mother relationship type")
+    citation_list: List[str] = Field(default_factory=list)
+    note_list: List[str] = Field(default_factory=list)
+    private: bool = Field(default=False)
 
 
 class FamilySaveParams(BaseModel):
@@ -40,7 +51,12 @@ class FamilySaveParams(BaseModel):
     father_handle: Optional[str] = Field(None, description="Father's handle")
     mother_handle: Optional[str] = Field(None, description="Mother's handle")
     child_handles: Optional[List[str]] = Field(
-        None, description="List of child handles"
+        None,
+        description="List of child handles (convenience field, converted to child_ref_list)",
+    )
+    child_ref_list: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="List of child references with relationship details",
     )
     event_ref_list: Optional[List[dict]] = Field(
         None, description="List of event references"
@@ -52,6 +68,54 @@ class FamilySaveParams(BaseModel):
     media_list: Optional[List[dict]] = Field(
         None, description="List of media references"
     )
+
+    @model_serializer
+    def serialize_model(self) -> Dict[str, Any]:
+        """
+        Custom serializer that converts child_handles to child_ref_list format.
+
+        The Gramps Web API expects child_ref_list with full reference objects,
+        not a simple list of handles. This serializer performs that conversion.
+        """
+        data = {}
+
+        # Add standard fields
+        if self.handle is not None:
+            data["handle"] = self.handle
+        if self.father_handle is not None:
+            data["father_handle"] = self.father_handle
+        if self.mother_handle is not None:
+            data["mother_handle"] = self.mother_handle
+        if self.event_ref_list is not None:
+            data["event_ref_list"] = self.event_ref_list
+        if self.note_list is not None:
+            data["note_list"] = self.note_list
+        if self.urls is not None:
+            data["urls"] = self.urls
+        if self.media_list is not None:
+            data["media_list"] = self.media_list
+
+        # Convert child_handles to child_ref_list if provided
+        # Reason: The API expects child_ref_list with full reference objects,
+        # but child_handles is more convenient for users to specify
+        if self.child_handles is not None:
+            child_refs = [
+                ChildReference(ref=handle).model_dump()
+                for handle in self.child_handles
+            ]
+            # Merge with any existing child_ref_list
+            if self.child_ref_list is not None:
+                existing_refs = set(
+                    ref.get("ref") for ref in self.child_ref_list if ref.get("ref")
+                )
+                new_refs = [r for r in child_refs if r["ref"] not in existing_refs]
+                data["child_ref_list"] = self.child_ref_list + new_refs
+            else:
+                data["child_ref_list"] = child_refs
+        elif self.child_ref_list is not None:
+            data["child_ref_list"] = self.child_ref_list
+
+        return data
 
 
 class FamilyTimelineParams(BaseModel):

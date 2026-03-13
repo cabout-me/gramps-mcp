@@ -234,15 +234,17 @@ class GrampsWebAPIClient:
         json_data = None
 
         if validated_params is not None:
-            params_dict = validated_params.model_dump(exclude_none=True)
             # POST and PUT operations use JSON body, GET operations use query parameters
             if (
                 api_call.method in ["POST", "PUT"]
                 and api_call != ApiCalls.POST_REPORT_FILE
             ):
-                json_data = params_dict
+                # For POST/PUT, include all non-None values (APIs expect complete objects)
+                json_data = validated_params.model_dump(exclude_none=True)
             else:
-                request_params = params_dict
+                # For GET, only include explicitly set values (not defaults)
+                # This prevents sending extra params that APIs may reject
+                request_params = validated_params.model_dump(exclude_unset=True)
 
         # For PUT operations, preserve existing data by merging with changes
         if api_call.method == "PUT" and json_data:
@@ -330,13 +332,27 @@ class GrampsWebAPIClient:
     async def upload_media_file(
         self, file_content: bytes, mime_type: str, tree_id: str = "default"
     ):
-        """Upload a media file to Gramps."""
+        """Upload a new media file to Gramps (creates new media object)."""
         url = self._build_url(tree_id, "media/")
         headers = await self._get_headers()
         headers["Content-Type"] = mime_type
 
         response = await self.auth_manager.client.request(
             method="POST", url=url, content=file_content, headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def update_media_file(
+        self, handle: str, file_content: bytes, mime_type: str, tree_id: str = "default"
+    ):
+        """Update an existing media object's file."""
+        url = self._build_url(tree_id, f"media/{handle}/file")
+        headers = await self._get_headers()
+        headers["Content-Type"] = mime_type
+
+        response = await self.auth_manager.client.request(
+            method="PUT", url=url, content=file_content, headers=headers
         )
         response.raise_for_status()
         return response.json()

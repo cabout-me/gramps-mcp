@@ -35,6 +35,15 @@ from .search_basic import with_client
 logger = logging.getLogger(__name__)
 
 
+def _get_arg(arguments, key, default=None):
+    """Get argument value from either dict or BaseModel."""
+    from pydantic import BaseModel
+
+    if isinstance(arguments, BaseModel):
+        return getattr(arguments, key, default)
+    return arguments.get(key, default)
+
+
 def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
@@ -47,13 +56,13 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 
 
 @with_client
-async def get_person_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_person_tool(client, arguments) -> List[TextContent]:
     """
     Get comprehensive person information using direct API calls.
     """
     try:
-        # Extract handle from arguments
-        handle = arguments.get("person_handle")
+        # Extract handle from arguments (handles both dict and BaseModel)
+        handle = _get_arg(arguments, "person_handle")
         if not handle:
             raise ValueError("person_handle is required")
 
@@ -71,13 +80,13 @@ async def get_person_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_family_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_family_tool(client, arguments) -> List[TextContent]:
     """
     Get detailed family information using direct API calls.
     """
     try:
-        # Extract handle from arguments
-        handle = arguments.get("family_handle")
+        # Extract handle from arguments (handles both dict and BaseModel)
+        handle = _get_arg(arguments, "family_handle")
         if not handle:
             raise ValueError("family_handle is required")
 
@@ -94,11 +103,11 @@ async def get_family_tool(client, arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "family details retrieval")
 
 
-async def get_type_tool(arguments: Dict) -> List[TextContent]:
+async def get_type_tool(arguments) -> List[TextContent]:
     """Universal get tool for person and family details."""
-    entity_type = arguments.get("type")
-    handle = arguments.get("handle")
-    gramps_id = arguments.get("gramps_id")
+    entity_type = _get_arg(arguments, "type")
+    handle = _get_arg(arguments, "handle")
+    gramps_id = _get_arg(arguments, "gramps_id")
 
     # If gramps_id provided but no handle, find the handle first
     if gramps_id and not handle:

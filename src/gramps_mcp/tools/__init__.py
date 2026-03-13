@@ -17,22 +17,29 @@
 """
 Unified interface for all MCP tools.
 
-This module exports all 24 genealogy tools organized by category:
-- Search & Discovery Tools (10)
-- Data Management Tools (9)
-- Analysis Tools (5)
+This module exports all 39 genealogy tools organized by category:
+- Search & Discovery Tools (3)
+- Data Management Tools (9 create + 10 delete + 4 tag/media + 2 upload = 25)
+- Analysis Tools (11)
 """
 
-# Search & Discovery Tools (10 tools)
-# Analysis Tools (4 tools)
+# Analysis Tools (11 tools)
 from .analysis import (
     get_ancestors_tool,
     get_descendants_tool,
+    get_event_span_tool,
+    get_facts_tool,
+    get_families_timeline_tool,
+    get_living_tool,
+    get_people_timeline_tool,
     get_recent_changes_tool,
+    get_relations_all_tool,
+    get_relations_tool,
     get_tree_info_tool,
+    get_types_tool,
 )
 
-# Data Management Tools (9 tools)
+# Data Management Tools (25 tools)
 from .data_management import (
     create_citation_tool,
     create_event_tool,
@@ -43,6 +50,21 @@ from .data_management import (
     create_place_tool,
     create_repository_tool,
     create_source_tool,
+    create_tag_tool,
+    delete_citation_tool,
+    delete_event_tool,
+    delete_family_tool,
+    delete_media_tool,
+    delete_note_tool,
+    delete_person_tool,
+    delete_place_tool,
+    delete_repository_tool,
+    delete_source_tool,
+    delete_tag_tool,
+    find_tags_tool,
+    get_media_file_tool,
+    update_media_file_tool,
+    upload_media_file_tool,
 )
 from .search_basic import (
     find_anything_tool,
@@ -74,7 +96,7 @@ __all__ = [
     "find_anything_tool",
     "get_person_tool",
     "get_family_tool",
-    # Data Management Tools
+    # Data Management Tools - Create
     "create_person_tool",
     "create_family_tool",
     "create_event_tool",
@@ -84,9 +106,34 @@ __all__ = [
     "create_note_tool",
     "create_media_tool",
     "create_repository_tool",
+    "create_tag_tool",
+    # Data Management Tools - Delete
+    "delete_person_tool",
+    "delete_family_tool",
+    "delete_event_tool",
+    "delete_note_tool",
+    "delete_citation_tool",
+    "delete_source_tool",
+    "delete_place_tool",
+    "delete_repository_tool",
+    "delete_media_tool",
+    "delete_tag_tool",
+    # Data Management Tools - Tags & Media
+    "find_tags_tool",
+    "get_media_file_tool",
+    "upload_media_file_tool",
+    "update_media_file_tool",
     # Analysis Tools
     "get_tree_info_tool",
     "get_descendants_tool",
     "get_ancestors_tool",
     "get_recent_changes_tool",
+    "get_relations_tool",
+    "get_relations_all_tool",
+    "get_living_tool",
+    "get_facts_tool",
+    "get_people_timeline_tool",
+    "get_families_timeline_tool",
+    "get_event_span_tool",
+    "get_types_tool",
 ]

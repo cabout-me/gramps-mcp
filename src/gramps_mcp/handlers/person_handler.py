@@ -74,6 +74,26 @@ async def format_person(client, tree_id: str, handle: str) -> str:
         # First line: Name (gender) - gramps_id - [handle]
         result = f"{name} ({gender_display}) - {gramps_id} - [{handle}]\n"
 
+        # Alternate names (married names, maiden names, etc.)
+        alternate_names = person_data.get("alternate_names", [])
+        if alternate_names:
+            alt_name_strs = []
+            for alt_name in alternate_names:
+                alt_given = alt_name.get("first_name", "")
+                alt_surname_list = alt_name.get("surname_list", [])
+                alt_surname = alt_surname_list[0].get("surname", "") if alt_surname_list else ""
+                alt_full = f"{alt_given} {alt_surname}".strip()
+                alt_type = alt_name.get("type", "")
+                if isinstance(alt_type, dict):
+                    alt_type = alt_type.get("string", "") or alt_type.get("_class", "")
+                if alt_full:
+                    if alt_type:
+                        alt_name_strs.append(f"{alt_full} ({alt_type})")
+                    else:
+                        alt_name_strs.append(alt_full)
+            if alt_name_strs:
+                result += f"Also known as: {', '.join(alt_name_strs)}\n"
+
         # Get birth and death events
         extended = person_data.get("extended", {})
         events = extended.get("events", [])

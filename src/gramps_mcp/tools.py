@@ -33,6 +33,13 @@ from .tools import (
     create_place_tool,
     create_repository_tool,
     create_source_tool,
+    # Delete Tools
+    delete_citation_tool,
+    delete_event_tool,
+    delete_family_tool,
+    delete_note_tool,
+    delete_person_tool,
+    delete_source_tool,
     find_anything_tool,
     find_citation_tool,
     find_event_tool,
@@ -48,6 +55,7 @@ from .tools import (
     get_family_tool,
     get_person_tool,
     get_recent_changes_tool,
+    get_relations_tool,
     # Analysis Tools
     get_tree_info_tool,
 )
@@ -76,9 +84,17 @@ __all__ = [
     "create_note_tool",
     "create_media_tool",
     "create_repository_tool",
+    # Delete Tools
+    "delete_person_tool",
+    "delete_family_tool",
+    "delete_event_tool",
+    "delete_note_tool",
+    "delete_citation_tool",
+    "delete_source_tool",
     # Analysis Tools
     "get_tree_info_tool",
     "get_descendants_tool",
     "get_ancestors_tool",
     "get_recent_changes_tool",
+    "get_relations_tool",
 ]

@@ -43,14 +43,14 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 16 Genealogy Tools
+### 39 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
 - **find_anything** - Text search across all genealogy data (matches literal text, not logical combinations)
 - **get_type** - Get comprehensive information about specific persons or families by ID
 
-#### Data Management (9 tools)
+#### Data Management (10 tools)
 - **create_person** - Create or update person records
 - **create_family** - Create or update family units
 - **create_event** - Create or update life events
@@ -60,11 +60,38 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **create_note** - Create or update textual notes
 - **create_media** - Create or update media files
 - **create_repository** - Create or update repository records
+- **create_tag** - Create or update tags for organizing records
 
-#### Analysis Tools (4 tools)
+#### Delete Tools (10 tools)
+- **delete_person** - Delete a person by handle
+- **delete_family** - Delete a family by handle
+- **delete_event** - Delete an event by handle
+- **delete_note** - Delete a note by handle
+- **delete_citation** - Delete a citation by handle
+- **delete_source** - Delete a source by handle
+- **delete_place** - Delete a place by handle
+- **delete_repository** - Delete a repository by handle
+- **delete_media** - Delete a media item by handle
+- **delete_tag** - Delete a tag by handle
+
+#### Tag & Media Tools (4 tools)
+- **find_tags** - Find/list all tags in the database
+- **get_media_file** - Get information about a media file (metadata and download URL)
+- **upload_media_file** - Upload a new media file from the local filesystem
+- **update_media_file** - Update an existing media object's file from the local filesystem
+
+#### Analysis Tools (12 tools)
 - **tree_stats** - Get tree statistics and information
 - **get_descendants** - Find all descendants of a person
 - **get_ancestors** - Find all ancestors of a person
+- **get_relations** - Find the relationship between two people (e.g., cousins, uncle/nephew)
+- **get_relations_all** - Find ALL possible relationship paths between two people
+- **get_living** - Check if a person is considered living (for privacy)
+- **get_facts** - Get computed facts and statistics about the tree
+- **get_people_timeline** - Get a timeline of events for a group of people
+- **get_families_timeline** - Get a timeline of events for a group of families
+- **get_event_span** - Calculate time span between two events (e.g., "how old was X when Y happened")
+- **get_types** - Get all valid type values (event types, name types, place types, etc.)
 - **recent_changes** - Track recent modifications to your data
 
 ## Installation
@@ -120,6 +147,23 @@ uv run python -m src.gramps_mcp.server stdio
 ```
 
 The HTTP server will be available at `http://localhost:8000/mcp`, while stdio runs directly in the terminal.
+
+### Media File Uploads
+
+To use the `upload_media_file` and `update_media_file` tools with Docker, you need to mount a volume so the container can access your local files:
+
+```bash
+# Example: Mount a local media folder
+docker run -d --name gramps-mcp -p 8000:8000 \
+  -v /path/to/your/media:/media \
+  -e GRAMPS_API_URL=https://your-gramps-web.com \
+  -e GRAMPS_USERNAME=your-username \
+  -e GRAMPS_PASSWORD=your-password \
+  -e GRAMPS_TREE_ID=your-tree-id \
+  gramps-mcp:latest
+```
+
+Then use `/media/filename.jpg` as the file path in the tool. When running without Docker (using uv directly), you can use absolute paths to any file on your system.
 
 ### Environment Configuration
 

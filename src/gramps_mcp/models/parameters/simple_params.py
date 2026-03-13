@@ -68,3 +68,9 @@ class SimpleGetParams(BaseModel):
     gramps_id: Optional[str] = Field(
         default=None, description="Gramps ID (e.g., I0001 or F0001)"
     )
+
+
+class EmptyParams(BaseModel):
+    """Empty parameters for tools that don't require any input."""
+
+    pass

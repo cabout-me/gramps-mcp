@@ -303,3 +303,32 @@ class TestFindAnythingTool:
             result_count = result[0].text.count("• **")
             assert result_count <= 3, f"Expected max 3 results, got {result_count}"
 
+    @pytest.mark.asyncio
+    async def test_find_anything_with_pydantic_model(self):
+        """Test find_anything_tool accepts a Pydantic BaseModel as arguments.
+
+        Regression test: Previously, isinstance checks against SimpleSearchParams
+        could fail when the MCP SDK reconstructed the model under a different
+        import path, causing the tool to silently use an empty query. This test
+        ensures that any BaseModel input is handled correctly via model_dump().
+        """
+        from pydantic import BaseModel
+
+        class ArbitraryMCPModel(BaseModel):
+            query: str
+            max_results: int = 20
+
+        arguments = ArbitraryMCPModel(query="pietrala", max_results=3)
+        result = await find_anything_tool(arguments)
+
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert "error" not in result[0].text.lower(), (
+            f"Error found in response: {result[0].text}"
+        )
+        # The query must have been forwarded correctly - an empty query would
+        # either error or return unrelated results without "pietrala" in the header
+        assert "pietrala" in result[0].text, (
+            f"Expected 'pietrala' in response, got: {result[0].text}"
+        )
+

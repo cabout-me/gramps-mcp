@@ -86,7 +86,7 @@ API_CALL_PARAMS: Dict[ApiCalls, Optional[Type[BaseModel]]] = {
     ApiCalls.GET_EVENT: BaseGetSingleParams,
     ApiCalls.PUT_EVENT: EventSaveParams,
     ApiCalls.DELETE_EVENT: None,  # Only needs handle (via URL)
-    ApiCalls.GET_EVENT_SPAN: EventSpanParams,
+    ApiCalls.GET_EVENT_SPAN: None,  # Handles via URL, optional query params don't need validation
     # PLACES operations
     ApiCalls.GET_PLACES: BaseGetMultipleParams,
     ApiCalls.POST_PLACES: PlaceSaveParams,

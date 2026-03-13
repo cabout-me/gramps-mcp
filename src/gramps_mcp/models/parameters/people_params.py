@@ -50,6 +50,14 @@ class PersonData(BaseDataModel):
     gender: int = Field(
         ..., ge=0, le=2, description="Gender (0=Female, 1=Male, 2=Unknown)"
     )
+    alternate_names: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description=(
+            "List of alternate names (married names, maiden names, etc). "
+            "Each name should have the same structure as primary_name with "
+            "first_name, surname_list, and type (e.g., 'Married Name', 'Birth Name')"
+        ),
+    )
     event_ref_list: Optional[List[EventReference]] = Field(
         None, description="List of references to events the person participated in"
     )

@@ -43,12 +43,21 @@ from .models.parameters.people_params import PersonData
 from .models.parameters.place_params import PlaceSaveParams
 from .models.parameters.repository_params import RepositoryData
 from .models.parameters.simple_params import (
+    EmptyParams,
     SimpleFindParams,
     SimpleGetParams,
     SimpleSearchParams,
 )
 from .models.parameters.source_params import SourceSaveParams
 from .models.parameters.transactions_params import TransactionHistoryParams
+from .models.parameters.delete_params import DeleteParams
+from .models.parameters.relations_params import RelationParams
+from .models.parameters.tag_params import TagSaveParams, TagSearchParams
+from .models.parameters.living_params import LivingParams
+from .models.parameters.facts_params import FactsParams
+from .models.parameters.timeline_params import PeopleTimelineParams, FamiliesTimelineParams
+from .models.parameters.media_params import MediaFileUploadParams, MediaFileUpdateParams
+from .models.parameters.event_params import EventSpanParams
 
 # Import all tool functions
 from .tools import (
@@ -61,11 +70,34 @@ from .tools import (
     create_place_tool,
     create_repository_tool,
     create_source_tool,
+    create_tag_tool,
+    delete_citation_tool,
+    delete_event_tool,
+    delete_family_tool,
+    delete_media_tool,
+    delete_note_tool,
+    delete_person_tool,
+    delete_place_tool,
+    delete_repository_tool,
+    delete_source_tool,
+    delete_tag_tool,
     find_anything_tool,
+    find_tags_tool,
     get_ancestors_tool,
     get_descendants_tool,
+    get_facts_tool,
+    get_families_timeline_tool,
+    get_living_tool,
+    get_media_file_tool,
+    get_people_timeline_tool,
     get_recent_changes_tool,
+    get_relations_all_tool,
+    get_relations_tool,
     get_tree_info_tool,
+    get_event_span_tool,
+    get_types_tool,
+    update_media_file_tool,
+    upload_media_file_tool,
 )
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
@@ -178,6 +210,52 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": RepositoryData,
         "handler": create_repository_tool,
     },
+    # Delete Tools
+    "delete_person": {
+        "description": "Delete a person by handle",
+        "schema": DeleteParams,
+        "handler": delete_person_tool,
+    },
+    "delete_family": {
+        "description": "Delete a family by handle",
+        "schema": DeleteParams,
+        "handler": delete_family_tool,
+    },
+    "delete_event": {
+        "description": "Delete an event by handle",
+        "schema": DeleteParams,
+        "handler": delete_event_tool,
+    },
+    "delete_note": {
+        "description": "Delete a note by handle",
+        "schema": DeleteParams,
+        "handler": delete_note_tool,
+    },
+    "delete_citation": {
+        "description": "Delete a citation by handle",
+        "schema": DeleteParams,
+        "handler": delete_citation_tool,
+    },
+    "delete_source": {
+        "description": "Delete a source by handle",
+        "schema": DeleteParams,
+        "handler": delete_source_tool,
+    },
+    "delete_place": {
+        "description": "Delete a place by handle",
+        "schema": DeleteParams,
+        "handler": delete_place_tool,
+    },
+    "delete_repository": {
+        "description": "Delete a repository by handle",
+        "schema": DeleteParams,
+        "handler": delete_repository_tool,
+    },
+    "delete_media": {
+        "description": "Delete a media item by handle",
+        "schema": DeleteParams,
+        "handler": delete_media_tool,
+    },
     # Analysis Tools
     "tree_stats": {
         "description": (
@@ -208,6 +286,92 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": TransactionHistoryParams,
         "handler": get_recent_changes_tool,
     },
+    "get_relations": {
+        "description": "Find the relationship between two people (e.g., cousins, uncle/nephew)",
+        "schema": RelationParams,
+        "handler": get_relations_tool,
+    },
+    "get_relations_all": {
+        "description": "Find ALL possible relationship paths between two people",
+        "schema": RelationParams,
+        "handler": get_relations_all_tool,
+    },
+    # Living & Facts Tools
+    "get_living": {
+        "description": "Check if a person is considered living (for privacy purposes)",
+        "schema": LivingParams,
+        "handler": get_living_tool,
+    },
+    "get_facts": {
+        "description": "Get computed facts and statistics about the family tree",
+        "schema": FactsParams,
+        "handler": get_facts_tool,
+    },
+    # Tag Tools
+    "find_tags": {
+        "description": "Find/list all tags in the database",
+        "schema": TagSearchParams,
+        "handler": find_tags_tool,
+    },
+    "create_tag": {
+        "description": "Create or update a tag for organizing records",
+        "schema": TagSaveParams,
+        "handler": create_tag_tool,
+    },
+    "delete_tag": {
+        "description": "Delete a tag by handle",
+        "schema": DeleteParams,
+        "handler": delete_tag_tool,
+    },
+    # Timeline Tools
+    "get_people_timeline": {
+        "description": "Get a timeline of events for a group of people",
+        "schema": PeopleTimelineParams,
+        "handler": get_people_timeline_tool,
+    },
+    "get_families_timeline": {
+        "description": "Get a timeline of events for a group of families",
+        "schema": FamiliesTimelineParams,
+        "handler": get_families_timeline_tool,
+    },
+    # Media File Tools
+    "get_media_file": {
+        "description": "Get information about a media file (metadata and download URL)",
+        "schema": DeleteParams,
+        "handler": get_media_file_tool,
+    },
+    "upload_media_file": {
+        "description": (
+            "Upload a new media file from the local filesystem - "
+            "creates a new media object with the file content"
+        ),
+        "schema": MediaFileUploadParams,
+        "handler": upload_media_file_tool,
+    },
+    "update_media_file": {
+        "description": (
+            "Update an existing media object's file from the local filesystem - "
+            "replaces the file content for an existing media object"
+        ),
+        "schema": MediaFileUpdateParams,
+        "handler": update_media_file_tool,
+    },
+    # Event & Type Tools
+    "get_event_span": {
+        "description": (
+            "Calculate time span between two events - useful for 'how old was X when Y happened' queries"
+        ),
+        "schema": EventSpanParams,
+        "handler": get_event_span_tool,
+    },
+    "get_types": {
+        "description": (
+            "Get all valid type values (event types, name types, place types, etc.) - "
+            "reference for creating records"
+        ),
+        "schema": EmptyParams,
+        "handler": get_types_tool,
+    },
 }
 
 
@@ -229,13 +393,23 @@ def register_tools():
         description = tool_config["description"]
 
         # Create the async handler function with proper schema annotation
-        async def create_handler(arguments, handler=handler_func):
-            return await handler(arguments.model_dump())
+        # Pass the validated Pydantic model directly to the handler
+        # Handlers will check if they receive a BaseModel and skip re-validation
+        if schema == EmptyParams:
+            # For tools with no parameters, make arguments optional
+            async def create_handler(arguments: Optional[EmptyParams] = None, handler=handler_func):
+                return await handler(arguments or {})
+
+            create_handler.__annotations__ = {"arguments": Optional[EmptyParams]}
+        else:
+            async def create_handler(arguments, handler=handler_func):
+                return await handler(arguments)
+
+            create_handler.__annotations__ = {"arguments": schema}
 
         # Set proper metadata
         create_handler.__name__ = tool_name
         create_handler.__doc__ = description
-        create_handler.__annotations__ = {"arguments": schema}
 
         # Register with FastMCP
         app.tool(description=description)(create_handler)
@@ -294,7 +468,7 @@ async def root(request):
             "version": "1.0.0",
             "description": "MCP server for Gramps Web API genealogy operations",
             "mcp_endpoint": "/mcp",
-            "tools_count": 16,
+            "tools_count": 39,
         }
     )
 
@@ -305,7 +479,7 @@ async def health_check(request):
     from starlette.responses import JSONResponse
 
     return JSONResponse(
-        {"status": "healthy", "service": "Gramps MCP Server", "tools": 16}
+        {"status": "healthy", "service": "Gramps MCP Server", "tools": 39}
     )
 
 
