@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev --python ${{ matrix.python-version }}
+
+      - name: Run direct-client unit tests
+        run: uv run pytest tests/test_direct_client.py -v --tb=short
+
+      - name: Run other unit tests (excluding integration)
+        run: uv run pytest tests/ --ignore=tests/test_direct_client.py -m "not integration" -v --tb=short
+        continue-on-error: true  # existing tests may need env vars

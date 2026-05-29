@@ -52,6 +52,7 @@ from .models.parameters.transactions_params import TransactionHistoryParams
 
 # Import all tool functions
 from .tools import (
+    close_database_tool,
     create_citation_tool,
     create_event_tool,
     create_family_tool,
@@ -66,6 +67,8 @@ from .tools import (
     get_descendants_tool,
     get_recent_changes_tool,
     get_tree_info_tool,
+    list_databases_tool,
+    open_database_tool,
 )
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
@@ -74,6 +77,22 @@ from .tools.search_details import get_type_tool
 # Simple analysis models for tools that use direct dict access
 class TreeInfoParams(BaseModel):
     include_statistics: bool = Field(True, description="Include statistics")
+
+
+class OpenDatabaseParams(BaseModel):
+    path: str = Field(
+        description=(
+            "Absolute path to the Gramps database. "
+            "Accepted formats: "
+            ".sqlite or .db file (read/write, live DB), "
+            "directory containing sqlite.db (read/write), "
+            ".gpkg or .gramps file (read-only)."
+        )
+    )
+
+
+class EmptyParams(BaseModel):
+    """No parameters required."""
 
 
 class DescendantsParams(BaseModel):
@@ -208,6 +227,35 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "schema": TransactionHistoryParams,
         "handler": get_recent_changes_tool,
     },
+    # Database lifecycle
+    "list_databases": {
+        "description": (
+            "List all Gramps databases (family trees) found on this machine. "
+            "Shows name, backend type, path, and whether read/write access "
+            "is available. Use open_database with the shown path to connect."
+        ),
+        "schema": EmptyParams,
+        "handler": list_databases_tool,
+    },
+    "open_database": {
+        "description": (
+            "Open a Gramps database file or directory. "
+            "SQLite databases support full read/write; "
+            ".gpkg/.gramps files are read-only. "
+            "Replaces any currently open database."
+        ),
+        "schema": OpenDatabaseParams,
+        "handler": open_database_tool,
+    },
+    "close_database": {
+        "description": (
+            "Close the current database connection and release the lock file. "
+            "Call this before opening the database in Gramps Desktop to avoid "
+            "conflicts. Call open_database again when you want to reconnect."
+        ),
+        "schema": EmptyParams,
+        "handler": close_database_tool,
+    },
 }
 
 
@@ -341,18 +389,23 @@ async def run_stdio_server():
         )
 
 
-if __name__ == "__main__":
-    # Determine transport type from command line arguments or environment
+def main():
+    """
+    CLI entry point for the gramps-mcp binary.
+
+    Usage:
+        gramps-mcp           # HTTP transport on port 8000
+        gramps-mcp stdio     # stdio transport (for Claude Desktop, Claude Code)
+    """
     transport_type = sys.argv[1] if len(sys.argv) > 1 else "streamable-http"
 
     if transport_type == "stdio":
-        # Run with stdio transport for CLI usage
         asyncio.run(run_stdio_server())
     else:
-        # Run the FastMCP server with streamable HTTP transport
-        # Configure server settings
-        app.settings.host = "0.0.0.0"  # Listen on all interfaces for Docker
+        app.settings.host = "0.0.0.0"
         app.settings.port = 8000
-
-        # Run with streamable-http transport for production use
         app.run(transport="streamable-http")
+
+
+if __name__ == "__main__":
+    main()

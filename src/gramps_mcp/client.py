@@ -22,6 +22,7 @@ for all Gramps Web API operations through the make_api_call method.
 """
 
 import logging
+import os
 import re
 from typing import Dict, Optional, Union
 from urllib.parse import urljoin
@@ -343,4 +344,312 @@ class GrampsWebAPIClient:
 
 
 # Export the main classes for easy import
-__all__ = ["GrampsWebAPIClient", "GrampsAPIError"]
+__all__ = [
+    "GrampsWebAPIClient", "GrampsAPIError",
+    "get_client", "open_database", "close_database", "list_databases",
+]
+
+
+_direct_client_singleton = None
+_direct_client_path: str = ""
+
+
+def _is_sqlite_path(path: str) -> bool:
+    """Return True if *path* points to a Gramps SQLite database."""
+    import os
+    if path.lower().endswith((".sqlite", ".db")):
+        return True
+    if os.path.isdir(path) and os.path.exists(os.path.join(path, "sqlite.db")):
+        return True
+    return False
+
+
+def get_client():
+    """
+    Return the active Gramps client.
+
+    Priority order:
+
+    1. **Runtime singleton** — set by :func:`open_database` (the
+       ``open_database`` MCP tool).  This takes precedence over all env
+       vars so the agent can switch databases at runtime without
+       restarting the server.
+
+    2. **``GRAMPS_DB_PATH`` env var** — path to a ``.sqlite`` /
+       ``.gpkg`` / ``.gramps`` file.  A new client is created and cached
+       as a singleton.
+
+    3. **``GRAMPS_API_URL`` env var** — fall back to
+       :class:`GrampsWebAPIClient`.
+
+    4. **Nothing configured** — raises :class:`GrampsAPIError` with a
+       hint to call ``list_databases`` / ``open_database``.
+
+    Returns:
+        The active client instance.
+
+    Raises:
+        GrampsAPIError: If no database is currently open or configured.
+    """
+    global _direct_client_singleton, _direct_client_path
+
+    # 1. Runtime singleton (set by open_database tool)
+    if _direct_client_singleton is not None:
+        return _direct_client_singleton
+
+    # 2. GRAMPS_DB_PATH env var
+    settings = get_settings()
+    if settings.use_direct_backend:
+        path = settings.gramps_db_path
+        if _is_sqlite_path(path):
+            from .sqlite_client import GrampsSqliteClient
+            locked_by = _read_lock(path)
+            externally_locked = bool(
+                locked_by and "gramps_mcp" not in locked_by
+            )
+            if externally_locked:
+                logger.warning(
+                    "Database '%s' locked by '%s' — opening read-only.",
+                    path, locked_by,
+                )
+            _direct_client_singleton = GrampsSqliteClient(
+                path, read_only=externally_locked
+            )
+            if not externally_locked:
+                _write_lock(path)
+        else:
+            from .direct_client import GrampsDirectClient
+            _direct_client_singleton = GrampsDirectClient(path)
+        _direct_client_path = path
+        return _direct_client_singleton
+
+    # 3. GRAMPS_API_URL env var
+    if settings.gramps_api_url:
+        return GrampsWebAPIClient()
+
+    # 4. Nothing configured
+    raise GrampsAPIError(
+        "No database connected. "
+        "Use list_databases to see available Gramps trees, "
+        "then open_database(path) to connect."
+    )
+
+
+def _lock_dir(db_path: str) -> str:
+    """Return the tree directory that contains the Gramps lock file."""
+    import os
+    if os.path.isfile(db_path):
+        return os.path.dirname(db_path)
+    return db_path
+
+
+def _lock_path(db_path: str) -> str:
+    """Return the path to the Gramps lock file for a database."""
+    import os
+    return os.path.join(_lock_dir(db_path), "lock")
+
+
+def _read_lock(db_path: str) -> str:
+    """Return the content of the lock file, or '' if no lock exists."""
+    import os
+    p = _lock_path(db_path)
+    if os.path.exists(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            pass
+    return ""
+
+
+def _write_lock(db_path: str) -> None:
+    """Write a Gramps-compatible lock file so Desktop sees the agent."""
+    import socket
+    content = f"gramps_mcp@{socket.gethostname()}"
+    try:
+        with open(_lock_path(db_path), "w", encoding="utf-8") as f:
+            f.write(content)
+    except OSError as exc:
+        logger.warning(
+            "Could not write Gramps lock file '%s': %s — "
+            "Gramps Desktop may not see this agent as active.",
+            _lock_path(db_path), exc,
+        )
+
+
+def _clear_lock(db_path: str) -> None:
+    """Remove the lock file written by this process."""
+    import os
+    p = _lock_path(db_path)
+    try:
+        if os.path.exists(p):
+            content = _read_lock(db_path)
+            if "gramps_mcp" in content:
+                os.remove(p)
+    except OSError:
+        pass
+
+
+def _gramps_db_root() -> str:
+    """
+    Return the platform-specific Gramps grampsdb directory.
+
+    Returns:
+        Absolute path to the grampsdb directory, or empty string if not found.
+    """
+    import os
+    import sys
+    candidates = []
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            candidates.append(os.path.join(appdata, "gramps", "grampsdb"))
+    else:
+        home = os.path.expanduser("~")
+        candidates += [
+            os.path.join(home, ".local", "share", "gramps", "grampsdb"),
+            os.path.join(home, ".gramps", "grampsdb"),
+        ]
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return ""
+
+
+def list_databases() -> list:
+    """
+    Return metadata for every Gramps database found on this machine.
+
+    Reads the Gramps ``grampsdb`` directory and inspects each tree's
+    ``name.txt`` and ``database.txt`` files.
+
+    Returns:
+        List of dicts with keys: ``id``, ``name``, ``backend``,
+        ``path`` (to the SQLite file or directory), ``writable``.
+    """
+    import os
+    root = _gramps_db_root()
+    if not root:
+        return []
+    results = []
+    for entry in sorted(os.listdir(root)):
+        tree_dir = os.path.join(root, entry)
+        if not os.path.isdir(tree_dir):
+            continue
+        name_file = os.path.join(tree_dir, "name.txt")
+        backend_file = os.path.join(tree_dir, "database.txt")
+        name = ""
+        backend = ""
+        if os.path.exists(name_file):
+            with open(name_file, encoding="utf-8") as f:
+                name = f.read().strip()
+        if os.path.exists(backend_file):
+            with open(backend_file, encoding="utf-8") as f:
+                backend = f.read().strip()
+        sqlite_path = os.path.join(tree_dir, "sqlite.db")
+        if os.path.exists(sqlite_path):
+            db_path = sqlite_path
+            writable = True
+        else:
+            db_path = tree_dir
+            writable = False
+        locked_by = _read_lock(tree_dir)
+        results.append({
+            "id": entry,
+            "name": name or entry,
+            "backend": backend or "unknown",
+            "path": db_path,
+            "writable": writable,
+            "locked_by": locked_by,
+        })
+    return results
+
+
+def _close_singleton() -> None:
+    """Close the current singleton's DB connection if it has one."""
+    global _direct_client_singleton
+    if _direct_client_singleton is None:
+        return
+    db = getattr(_direct_client_singleton, "_db", None)
+    if db is not None and hasattr(db, "close"):
+        try:
+            db.close()
+        except Exception:
+            pass
+    _direct_client_singleton = None
+
+
+def open_database(path: str):
+    """
+    Open a Gramps database, replacing any currently active singleton.
+
+    Accepts ``.sqlite`` / ``.db`` files (or directories containing
+    ``sqlite.db``) for full read/write access, or ``.gpkg`` / ``.gramps``
+    files for read-only access.
+
+    Checks for an existing Gramps lock file and logs a warning if Gramps
+    Desktop appears to have the database open.  Writes its own lock file
+    (``lock`` containing ``gramps_mcp@<hostname>``) so Gramps Desktop will
+    show a "database in use" dialog if the user tries to open it.
+
+    Args:
+        path: Absolute path to the database file or directory.
+
+    Returns:
+        Tuple ``(client, locked_by)`` where *locked_by* is a non-empty
+        string if a pre-existing lock was found, else empty string.
+
+    Raises:
+        GrampsAPIError: If the path does not exist or is not recognised.
+    """
+    global _direct_client_singleton, _direct_client_path
+    import os
+    if not os.path.exists(path):
+        raise GrampsAPIError(f"Database path not found: '{path}'")
+    _close_singleton()
+
+    locked_by = _read_lock(path)
+    externally_locked = bool(locked_by and "gramps_mcp" not in locked_by)
+
+    if _is_sqlite_path(path):
+        from .sqlite_client import GrampsSqliteClient
+        if externally_locked:
+            logger.warning(
+                "Database '%s' locked by '%s' — opening read-only.",
+                path, locked_by,
+            )
+        _direct_client_singleton = GrampsSqliteClient(
+            path, read_only=externally_locked
+        )
+        if not externally_locked:
+            _write_lock(path)
+    else:
+        from .direct_client import GrampsDirectClient
+        _direct_client_singleton = GrampsDirectClient(path)
+
+    _direct_client_path = path
+    return _direct_client_singleton, locked_by
+
+
+def close_database() -> str:
+    """
+    Close the current database connection and release the singleton.
+
+    For SQLite databases, also removes the Gramps lock file written by
+    :func:`open_database` so Gramps Desktop can open cleanly.
+    For XML/gpkg files, the lock step is skipped (no lock is written for
+    read-only backends).
+
+    Returns:
+        Path of the database that was closed, or empty string if none
+        was open.
+    """
+    global _direct_client_path
+    path = _direct_client_path
+    if path and _is_sqlite_path(path):
+        _clear_lock(path)
+    _close_singleton()
+    _direct_client_path = ""  # reset so close is idempotent and path is not stale
+    return path
+
+

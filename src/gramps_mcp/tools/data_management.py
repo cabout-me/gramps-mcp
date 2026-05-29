@@ -26,7 +26,7 @@ from typing import Dict, List
 
 from mcp.types import TextContent
 
-from ..client import GrampsAPIError, GrampsWebAPIClient
+from ..client import GrampsAPIError, GrampsWebAPIClient, get_client
 from ..config import get_settings
 from ..handlers.citation_handler import format_citation
 from ..handlers.event_handler import format_event
@@ -97,7 +97,7 @@ async def _handle_crud_operation(
         tree_id = settings.gramps_tree_id
 
         # Create client and make unified API call
-        client = GrampsWebAPIClient()
+        client = get_client()
         try:
             # Choose API call based on whether handle is provided (update vs create)
             if hasattr(validated_params, "handle") and validated_params.handle:
@@ -208,7 +208,7 @@ async def create_family_tool(arguments: Dict) -> List[TextContent]:
         tree_id = settings.gramps_tree_id
 
         # Create client and make unified API call
-        client = GrampsWebAPIClient()
+        client = get_client()
         try:
             # Choose API call based on whether handle is provided (update vs create)
             if params.handle:
@@ -312,7 +312,7 @@ async def create_media_tool(arguments: Dict) -> List[TextContent]:
         settings = get_settings()
         tree_id = settings.gramps_tree_id
 
-        client = GrampsWebAPIClient()
+        client = get_client()
         try:
             # If a handle is provided, we are updating an existing media object
             if params and params.handle:
@@ -411,7 +411,7 @@ async def create_repository_tool(arguments: Dict) -> List[TextContent]:
         tree_id = settings.gramps_tree_id
 
         # Create client and make unified API call
-        client = GrampsWebAPIClient()
+        client = get_client()
         try:
             # Choose API call based on whether handle is provided (update vs create)
             if params.handle:

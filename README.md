@@ -37,13 +37,13 @@ Find all families missing marriage dates and suggest research priorities
 
 No more manual data entry, no context switching between apps, no generic genealogy advice.
 
-- Connect to your Gramps Web API
+- Connect to Gramps Web, a local SQLite database, or a `.gpkg` export
 - Install Gramps MCP in your AI assistant
 - Start intelligent genealogy research with natural language
 
 ## Features
 
-### 16 Genealogy Tools
+### 19 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
@@ -67,13 +67,21 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **get_ancestors** - Find all ancestors of a person
 - **recent_changes** - Track recent modifications to your data
 
+#### Database Lifecycle Tools (3 tools)
+- **list_databases** - Discover all Gramps trees installed on this machine
+- **open_database** - Connect to a database file (auto-detects read/write vs read-only)
+- **close_database** - Release the database lock so Gramps Desktop can open it
+
 ## Installation
 
 ### Requirements
 
-- **Gramps Web server** with your family tree data - [Setup Guide](https://www.grampsweb.org/install_setup/setup/)
-- Docker and Docker Compose
-- MCP-compatible AI assistant (Claude Desktop, Cursor, etc.)
+- MCP-compatible AI assistant (Claude Desktop, Cursor, Claude Code, etc.)
+- **One of the three backends** (see [Direct Backends](#direct-backends-local-file-access) below):
+  - **Gramps Web server** — [Setup Guide](https://www.grampsweb.org/install_setup/setup/) — full read/write via HTTP
+  - **Local Gramps SQLite DB** — `grampsdb/*/sqlite.db` — full read/write, no server needed
+  - **Local `.gpkg` / `.gramps` file** — read-only export, no installation needed
+  - **No pre-configuration** — start the server and use `list_databases` + `open_database` at runtime
 
 ### Quick Start
 
@@ -123,15 +131,29 @@ The HTTP server will be available at `http://localhost:8000/mcp`, while stdio ru
 
 ### Environment Configuration
 
-Create a `.env` file with your Gramps Web settings:
+Create a `.env` file and choose **one** of the two backends:
 
+**Web backend** (full read/write access via Gramps Web):
 ```bash
-# Your Gramps Web instance (from step 1)
-GRAMPS_API_URL=https://your-gramps-web-domain.com  # Without /api suffix - will be added automatically
+GRAMPS_API_URL=https://your-gramps-web-domain.com  # Without /api suffix
 GRAMPS_USERNAME=your-gramps-web-username
 GRAMPS_PASSWORD=your-gramps-web-password
-GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
+GRAMPS_TREE_ID=your-tree-id  # System Information in Gramps Web
 ```
+
+**Direct SQLite backend** (read/write, no server required — points at the live DB):
+```bash
+GRAMPS_DB_PATH=/path/to/grampsdb/6a1764f8/sqlite.db
+```
+
+**Direct XML backend** (read-only, no Gramps installation required):
+```bash
+GRAMPS_DB_PATH=/path/to/your/family-tree.gpkg  # or .gramps file
+```
+
+**No env var** — start the server without any preconfiguration and use the
+``list_databases`` and ``open_database`` MCP tools to connect at runtime.
+`GRAMPS_DB_PATH` takes precedence over web backend variables when both are set.
 
 ## MCP Client Configuration
 
@@ -210,26 +232,80 @@ For any other MCP client, use the HTTP transport endpoint:
 }
 ```
 
+## Direct Backends (Local File Access)
+
+Both direct backends work without a running Gramps Web server, Docker, GTK,
+or the `gramps` Python package.
+
+| | SQLite backend | XML backend |
+|---|---|---|
+| Source | `grampsdb/*/sqlite.db` (live DB) | `.gpkg` / `.gramps` (export) |
+| Writes | ✓ full read/write | ✗ read-only |
+| Data freshness | always live (lazy reads) | snapshot at export time |
+| Gramps lock file | ✓ respected & written | ✗ not applicable |
+| Setup | `GRAMPS_DB_PATH=/path/sqlite.db` | `GRAMPS_DB_PATH=/path/tree.gpkg` |
+
+### Zero-config discovery
+
+Start the server with no configuration and let the agent discover everything:
+
+```bash
+uv run python -m src.gramps_mcp.server stdio
+```
+
+The agent then calls `list_databases` (auto-discovers all Gramps trees on this
+machine) and `open_database` to connect.  No path, no env var, no config file.
+
+### Lock file behaviour (SQLite only)
+
+The SQLite backend participates in the Gramps lock protocol so Gramps Desktop
+knows when the agent is active:
+
+- **On open**: writes `gramps_mcp@hostname` to the `lock` file — Gramps Desktop
+  shows *"in use by gramps_mcp@hostname — open anyway?"*
+- **If locked by Gramps Desktop**: opens in **read-only mode** automatically
+- **On close**: removes the lock so Gramps Desktop can open cleanly
+
+### GQL support
+
+Both direct backends implement the most common GQL operators:
+
+- Property paths: `primary_name.first_name`
+- Array indexing: `surname_list[0].surname`
+- `.length` pseudo-property: `media_list.length > 0`
+- Operators: `=` `!=` `~` `!~` `>` `>=` `<` `<=`
+- Conjunctions: `and` / `or`
+
+Unsupported pseudo-properties (`any`, `all`, `get_person`, …) are treated as
+non-matching — users see fewer results rather than incorrect ones.
+
 ## Architecture
 
 ### Core Components
 
 ```
 src/gramps_mcp/
-|-- server.py           # MCP server with HTTP transport
-|-- tools.py            # Tool registry and exports
-|-- client.py           # Gramps Web API client
-|-- models.py           # Pydantic data models
-|-- auth.py             # JWT authentication
-|-- config.py           # Configuration management
-|-- tools/              # Modular tool implementations
+|-- server.py               # MCP server with HTTP transport
+|-- tools.py                # Tool registry and exports
+|-- client.py               # Backend factory, open/close/list helpers
+|-- direct_client.py        # XML backend — reads .gpkg/.gramps (read-only)
+|-- sqlite_client.py        # SQLite backend — reads/writes live Gramps DB
+|-- _gramps_parsers.py      # XML parsers: person, event, family
+|-- _gramps_parsers_ext.py  # XML parsers: place, source, citation, note, media, repo
+|-- _gramps_db.py           # In-memory DB from XML, BFS traversal, timelines
+|-- _gramps_sqlite.py       # Type maps, LazyDict proxy, GrampsSqliteDB
+|-- _gql.py                 # GQL filter engine (subset of Gramps Query Language)
+|-- models.py               # Pydantic data models
+|-- auth.py                 # JWT authentication
+|-- config.py               # Configuration management
+|-- tools/                  # Modular tool implementations
 |   |-- search_basic.py
 |   |-- search_details.py
 |   |-- data_management.py
-|   |-- tree_management.py
+|   |-- database.py         # list_databases, open_database, close_database
 |   `-- analysis.py
-|-- handlers/           # Data formatting handlers
-`-- client/             # API client modules
+|-- handlers/               # Data formatting handlers
+`-- client/                 # API client modules
 ```
 
 ### Technology Stack

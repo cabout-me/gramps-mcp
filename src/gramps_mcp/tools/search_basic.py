@@ -27,7 +27,7 @@ from typing import Callable, Dict, List
 
 from mcp.types import TextContent
 
-from ..client import GrampsAPIError, GrampsWebAPIClient
+from ..client import GrampsAPIError, get_client
 from ..config import get_settings
 from ..handlers.citation_handler import format_citation
 from ..handlers.event_handler import format_event
@@ -68,7 +68,10 @@ def with_client(func: Callable) -> Callable:
 
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        client = GrampsWebAPIClient()
+        try:
+            client = get_client()
+        except GrampsAPIError as exc:
+            return [TextContent(type="text", text=f"Error: {exc}")]
         try:
             return await func(client, *args, **kwargs)
         finally:
