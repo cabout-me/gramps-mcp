@@ -223,19 +223,57 @@ app = FastMCP("gramps", stateless_http=True, json_response=True)
 # Register all tools dynamically from the registry
 def register_tools():
     """Register all tools from the registry with FastMCP."""
+    import inspect
+    from typing import Annotated
+    from pydantic_core import PydanticUndefined
+
     for tool_name, tool_config in TOOL_REGISTRY.items():
         schema = tool_config["schema"]
         handler_func = tool_config["handler"]
         description = tool_config["description"]
 
-        # Create the async handler function with proper schema annotation
-        async def create_handler(arguments, handler=handler_func):
-            return await handler(arguments.model_dump())
+        # Build a wrapper whose signature exposes one parameter per Pydantic
+        # field, so FastMCP's func_metadata picks up each field as a separate
+        # entry in the arg-model and publishes it at top level on inputSchema.
+        # Annotating the wrapped param with the schema class itself does NOT
+        # unwrap — FastMCP treats it as a single nested object field.
+        def _make_wrapped(_handler, _schema):
+            fields = _schema.model_fields
+            parameters = []
+            annotations = {}
+            for fname, finfo in fields.items():
+                if finfo.default is not PydanticUndefined:
+                    default = finfo.default
+                elif finfo.default_factory is not None:
+                    default = finfo.default_factory()
+                else:
+                    default = inspect.Parameter.empty
+                # Use Annotated[ann, FieldInfo] so descriptions and validators
+                # carry through to the published schema.
+                annotated = Annotated[finfo.annotation, finfo]
+                parameters.append(
+                    inspect.Parameter(
+                        name=fname,
+                        kind=inspect.Parameter.KEYWORD_ONLY,
+                        default=default,
+                        annotation=annotated,
+                    )
+                )
+                annotations[fname] = annotated
+
+            async def wrapped(**kwargs):
+                validated = _schema(**kwargs)
+                return await _handler(validated.model_dump())
+
+            wrapped.__signature__ = inspect.Signature(parameters=parameters)
+            wrapped.__annotations__ = annotations
+            return wrapped
+
+        create_handler = _make_wrapped(handler_func, schema)
 
         # Set proper metadata
         create_handler.__name__ = tool_name
         create_handler.__doc__ = description
-        create_handler.__annotations__ = {"arguments": schema}
 
         # Register with FastMCP
         app.tool(description=description)(create_handler)
