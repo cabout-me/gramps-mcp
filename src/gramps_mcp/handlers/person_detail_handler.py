@@ -281,8 +281,15 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
         )
         note_type = note_data.get("type", "")
         note_id = note_data.get("gramps_id", "")
-        note_text = note_data.get("text", "")[:50]
-        if len(note_data.get("text", "")) > 50:
+        # Gramps API returns Note.text as a StyledText dict {"string": ..., "tags": [...]};
+        # older shapes may return a plain string. Extract the string before slicing.
+        text_field = note_data.get("text", "")
+        note_text_full = (
+            text_field.get("string", "") if isinstance(text_field, dict)
+            else (text_field or "")
+        )
+        note_text = note_text_full[:50]
+        if len(note_text_full) > 50:
             note_text += "..."
         result += f"- {note_type}: {note_text} ({note_id})\n"
 
