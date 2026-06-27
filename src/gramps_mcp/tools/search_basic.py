@@ -212,18 +212,23 @@ async def _search_entities(
         return [TextContent(type="text", text=formatted_results)]
 
     except Exception as e:
-        return _format_error_response(e, f"{entity_type} search")
+        _format_error_response(e, f"{entity_type} search")
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
-    """Format error into user-friendly MCP response."""
+def _format_error_response(error: Exception, operation: str) -> None:
+    """Raise a GrampsAPIError so the MCP framework reports isError=true.
+
+    Previously this returned a TextContent with "Error: ..." which the MCP
+    framework treated as a successful response (isError=false). Raising lets the
+    framework surface the error as a real protocol-level error.
+    """
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
     else:
         error_msg = f"Unexpected error during {operation}: {str(error)}"
 
     logger.error(f"Tool error in {operation}: {error_msg}")
-    return [TextContent(type="text", text=f"Error: {error_msg}")]
+    raise GrampsAPIError(error_msg)
 
 
 # ============================================================================
@@ -449,4 +454,4 @@ async def find_anything_tool(client, arguments: Dict) -> List[TextContent]:
         return [TextContent(type="text", text=formatted_results)]
 
     except Exception as e:
-        return _format_error_response(e, "full-text search")
+        _format_error_response(e, "full-text search")

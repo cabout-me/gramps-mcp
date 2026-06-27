@@ -51,15 +51,20 @@ from ..models.parameters.source_params import SourceSaveParams
 logger = logging.getLogger(__name__)
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
-    """Format error into user-friendly MCP response."""
+def _format_error_response(error: Exception, operation: str) -> None:
+    """Raise a GrampsAPIError so the MCP framework reports isError=true.
+
+    Previously this returned a TextContent with "Error: ..." which the MCP
+    framework treated as a successful response (isError=false). Raising lets the
+    framework surface the error as a real protocol-level error.
+    """
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
     else:
         error_msg = f"Unexpected error during {operation}: {str(error)}"
 
     logger.error(f"Tool error in {operation}: {error_msg}")
-    return [TextContent(type="text", text=f"Error: {error_msg}")]
+    raise GrampsAPIError(error_msg)
 
 
 def _extract_entity_data(result, entity_type: str = None):
@@ -127,7 +132,7 @@ async def _handle_crud_operation(
             await client.close()
 
     except Exception as e:
-        return _format_error_response(e, f"{entity_type} save")
+        _format_error_response(e, f"{entity_type} save")
 
 
 async def _format_save_response(
@@ -238,7 +243,7 @@ async def create_family_tool(arguments: Dict) -> List[TextContent]:
             await client.close()
 
     except Exception as e:
-        return _format_error_response(e, "family save")
+        _format_error_response(e, "family save")
 
 
 async def create_event_tool(arguments: Dict) -> List[TextContent]:
@@ -377,7 +382,7 @@ async def create_media_tool(arguments: Dict) -> List[TextContent]:
             await client.close()
 
     except Exception as e:
-        return _format_error_response(e, "media save")
+        _format_error_response(e, "media save")
 
 
 async def create_repository_tool(arguments: Dict) -> List[TextContent]:
@@ -441,4 +446,4 @@ async def create_repository_tool(arguments: Dict) -> List[TextContent]:
             await client.close()
 
     except Exception as e:
-        return _format_error_response(e, "repository save")
+        _format_error_response(e, "repository save")
