@@ -166,7 +166,7 @@ Add to your Claude Desktop MCP configuration file (`claude_desktop_config.json`)
 
 ### OpenWebUI
 
-OpenWebUI recommends using the [mcpo proxy](https://docs.openwebui.com/openapi-servers/mcp/) to expose MCP servers as OpenAPI endpoints.
+OpenWebUI recommends using the [mcpo proxy](https://github.com/open-webui/mcpo) to expose MCP servers as OpenAPI endpoints.
 
 **With uv:**
 ```bash
