@@ -26,7 +26,7 @@ API calls supported in this category:
 - GET_FAMILY_TIMELINE: Get the timeline for all the people in a specific family
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -52,6 +52,30 @@ class FamilySaveParams(BaseModel):
     media_list: Optional[List[dict]] = Field(
         None, description="List of media references"
     )
+
+    def to_api_payload(self, **kwargs: Any) -> dict[str, Any]:
+        """Serialize for the Gramps Web API, translating ``child_handles``
+        (a user-friendly list of handle strings) into ``child_ref_list``
+        (a list of ``{"ref": handle}`` dicts) that the API expects.
+
+        ``model_dump`` keeps ``child_handles`` as ``List[str]`` so the model
+        can be re-validated or inspected without losing information. The
+        Gramps Web REST API does not recognise ``child_handles``; this method
+        performs the translation and is what the API client should call when
+        building an HTTP request body.
+        """
+        data = super().model_dump(**kwargs)
+        # Translate ``child_handles`` (List[str]) into the ``child_ref_list``
+        # (List[{"ref": handle}]) format the Gramps Web API expects. Treat
+        # ``None`` and ``[]`` identically: omit ``child_ref_list`` from the
+        # payload so existing children are preserved on a PUT, and drop the
+        # user-facing ``child_handles`` key so the payload only carries the
+        # field the API understands.
+        child_handles = data.get("child_handles")
+        if child_handles:
+            data["child_ref_list"] = [{"ref": h} for h in child_handles]
+        data.pop("child_handles", None)
+        return data
 
 
 class FamilyTimelineParams(BaseModel):
