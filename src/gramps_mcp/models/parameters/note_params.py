@@ -67,10 +67,16 @@ class NoteSaveParams(BaseModel):
     text: str = Field(..., description="Note text content")
     type: str = Field(..., description="The type of note")
 
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Convert to API format with StyledText structure."""
+    def to_api_payload(self, **kwargs: Any) -> dict[str, Any]:
+        """Serialize for the Gramps Web API with StyledText wrapping for ``text``.
+
+        ``model_dump`` keeps ``text`` as a plain string so the model can be
+        re-validated or inspected without losing information. The Gramps Web
+        REST API expects ``text`` as a ``StyledText`` dict; this method
+        performs that wrapping and is what the API client should call when
+        building an HTTP request body.
+        """
         data = super().model_dump(**kwargs)
-        # Transform text string to StyledText format expected by API
         if "text" in data and isinstance(data["text"], str):
             data["text"] = {
                 "_class": "StyledText",
