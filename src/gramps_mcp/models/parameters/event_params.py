@@ -62,6 +62,34 @@ class EventSaveParams(BaseModel):
     citation_list: List[str] = Field(..., description="List of citation handles")
     note_list: Optional[List[str]] = Field(None, description="List of note handles")
 
+    def to_api_payload(self, **kwargs: Any) -> Dict[str, Any]:
+        """Serialize for the Gramps Web REST API.
+
+        The Gramps Web API represents ``citation_list`` and ``note_list``
+        as lists of ``{"ref": handle}`` references, matching the format the
+        API itself returns on ``GET``. ``model_dump`` keeps the handles as
+        plain strings for re-validation, so the API translation lives here.
+
+        ``kwargs`` are forwarded to ``model_dump`` so callers can pass
+        ``exclude_none=True`` (or any future Pydantic option) and inherit
+        the model's standard filtering behavior. ``None`` and ``[]`` are
+        treated identically: ``note_list`` of ``None`` or ``[]`` is omitted
+        from the payload so a ``PUT`` does not clobber existing notes.
+        ``citation_list`` is required, so it is always translated to the
+        reference shape.
+        """
+
+        data = self.model_dump(**kwargs)
+        if data.get("citation_list") is not None:
+            data["citation_list"] = [
+                {"ref": handle} for handle in data["citation_list"]
+            ]
+        if data.get("note_list"):
+            data["note_list"] = [{"ref": handle} for handle in data["note_list"]]
+        else:
+            data.pop("note_list", None)
+        return data
+
 
 class EventSpanParams(BaseModel):
     """Parameters for getting elapsed time span between two events."""

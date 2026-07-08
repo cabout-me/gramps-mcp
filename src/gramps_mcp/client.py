@@ -234,7 +234,14 @@ class GrampsWebAPIClient:
         json_data = None
 
         if validated_params is not None:
-            params_dict = validated_params.model_dump(exclude_none=True)
+            # Prefer ``to_api_payload`` when the model defines it so handles
+            # are translated to the Gramps Web REST API's reference-list
+            # shape (``[{"ref": handle}]``). Fall back to ``model_dump`` for
+            # plain models.
+            if hasattr(validated_params, "to_api_payload"):
+                params_dict = validated_params.to_api_payload(exclude_none=True)
+            else:
+                params_dict = validated_params.model_dump(exclude_none=True)
             # POST and PUT operations use JSON body, GET operations use query parameters
             if (
                 api_call.method in ["POST", "PUT"]
