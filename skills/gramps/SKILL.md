@@ -119,6 +119,20 @@ errors rather than degrading. The full list is at
 when you know a phrase. Results are wrapped as
 `{"object_type": "person", "object": {...}}`.
 
+`notes/` answers every `gql` query with a 500, through 3.19.0. Reach a note by
+searching its text, or from the object that references it.
+
+**`GET relations/{h1}/{h2}` names how two people are related**, computed
+server-side with the tree's kinship rules:
+
+```bash
+scripts/api.py GET relations/{h1}/{h2}
+# {"relationship_string": "father", "distance_common_origin": 1, ...}
+```
+
+`/all` returns every path between them; `-p depth=` bounds the search for a
+common ancestor, 15 generations by default.
+
 ## Writing
 
 ### Always find first
@@ -196,6 +210,19 @@ Take them verbatim from the database:
 ```bash
 scripts/api.py GET types/          # {"default": {...}, "custom": {...}}
 ```
+
+### Handle lists come in two shapes
+
+`citation_list`, `note_list` and `tag_list` hold bare handles. `media_list`,
+`event_ref_list`, `child_ref_list` and `person_ref_list` hold objects carrying
+`ref` plus fields of their own -- a role, a crop rectangle, a relationship.
+
+```bash
+scripts/spec.py Event    # array[string] against array[object], per field
+```
+
+Check the field before you build it, or mirror the same field on a record that
+already has one.
 
 ### Events attach to people
 
