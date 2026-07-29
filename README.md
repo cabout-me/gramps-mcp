@@ -1,342 +1,113 @@
-# Gramps MCP - AI-Powered Genealogy Research & Management
+# Gramps Skill
 
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.9+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
+An agent skill for researching and editing a family tree hosted on
+[Gramps Web](https://www.grampsweb.org/).
 
-## Without Gramps MCP
+It is a `SKILL.md`, three standard-library Python scripts, and a place to record
+your tree's own conventions. There is no server, no container, and nothing to
+install.
 
-Genealogy research with AI assistants is limited and frustrating:
+## Why there is no MCP server any more
 
-- No direct access to your family tree data
-- Manual data entry and research across multiple platforms
-- Generic genealogy advice without context of your specific family
-- No ability to automatically update or maintain your research
+This repository used to be `gramps-mcp`: an MCP server exposing 16 tools over
+~7,000 lines that mirrored the Gramps Web API. Two things made that mirror
+unnecessary.
 
-## With Gramps MCP
+**Gramps Web answers questions itself.** Since API v3.6.0 it ships a read-only
+AI assistant with its own tools for searching and filtering your tree. If you
+want to ask questions, use that -- it is closer to the data and maintained by
+the people who own it. This skill exists for the part it deliberately does not
+do: **writing**.
 
-Gramps MCP provides AI assistants with direct access to your Gramps genealogy database through a comprehensive set of tools. Your AI assistant can now:
+**Every instance describes itself.** Since v3.8 the API generates
+`openapi.json` from its own code and serves it unauthenticated. A vendored copy
+of the API surface is not just redundant, it is worse -- it goes stale silently,
+and this one had drifted into rejecting values the server accepts.
 
-- **Smart Search**: Find people, families, events, places, and sources across your entire database
-- **Data Management**: Create and update genealogy records with proper validation
-- **Tree Analysis**: Trace descendants, ancestors, and family connections
-- **Relationship Discovery**: Explore family connections and research gaps
-- **Tree Information**: Get comprehensive tree statistics and track changes
+What was left after removing everything the API can do for itself is
+credentials, genealogy practice, and the traps. That is the skill.
 
-Add Gramps MCP to your AI assistant and transform how you research family history:
+## Install
 
-```txt
-Search for all descendants of John Smith born in Ireland before 1850
-```
-
-```txt
-Create a new person record for Mary O'Connor with birth date 1823 in County Cork
-```
-
-```txt
-Find all families missing marriage dates and suggest research priorities
-```
-
-No more manual data entry, no context switching between apps, no generic genealogy advice.
-
-- Connect to your Gramps Web API
-- Install Gramps MCP in your AI assistant
-- Start intelligent genealogy research with natural language
-
-## Features
-
-### 16 Genealogy Tools
-
-#### Search & Retrieval (3 tools)
-- **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
-- **find_anything** - Text search across all genealogy data (matches literal text, not logical combinations)
-- **get_type** - Get comprehensive information about specific persons or families by ID
-
-#### Data Management (9 tools)
-- **create_person** - Create or update person records
-- **create_family** - Create or update family units
-- **create_event** - Create or update life events
-- **create_place** - Create or update geographic locations
-- **create_source** - Create or update source documents
-- **create_citation** - Create or update citations
-- **create_note** - Create or update textual notes
-- **create_media** - Create or update media files
-- **create_repository** - Create or update repository records
-
-#### Analysis Tools (4 tools)
-- **tree_stats** - Get tree statistics and information
-- **get_descendants** - Find all descendants of a person
-- **get_ancestors** - Find all ancestors of a person
-- **recent_changes** - Track recent modifications to your data
-
-## Installation
-
-### Requirements
-
-- **Gramps Web server** with your family tree data - [Setup Guide](https://www.grampsweb.org/install_setup/setup/)
-- Docker and Docker Compose
-- MCP-compatible AI assistant (Claude Desktop, Cursor, etc.)
-
-### Quick Start
-
-1. **Ensure Gramps Web is Running**:
-   - Follow the [Gramps Web setup guide](https://www.grampsweb.org/install_setup/setup/) to get your family tree online
-   - Note your Gramps Web URL, username, and password
-   - Find your tree ID under System Information in your Gramps Web interface
-
-2. **Start the Server**:
+Clone it where your agent looks for skills, for example:
 
 ```bash
-# Download the configuration
-curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/.env.example
-cp .env.example .env
-# Edit .env with your Gramps Web API credentials
-
-# Start the server
-docker-compose up -d
+git clone https://github.com/cabout-me/gramps-skill ~/.claude/skills/gramps
 ```
 
-That's it! The MCP server will be running at `http://localhost:8000/mcp`
+Then set three variables, in the environment or a `.env` file at the repo root:
 
-### Alternative: Run Without Docker
+```
+GRAMPS_API_URL=https://your-instance.example.com
+GRAMPS_USERNAME=you
+GRAMPS_PASSWORD=...
+```
 
-If you prefer to run the server directly with Python:
+That is the whole setup. The scripts use only the standard library, so any
+`python3` will run them.
 
-1. **Setup Python Environment**:
+## What is in it
+
+```
+skills/gramps/
+  SKILL.md              genealogy practice, and the API behaviour worth knowing
+  scripts/api.py        authenticated passthrough; any endpoint, any method
+  scripts/spec.py       expands schemas from the live OpenAPI spec
+  scripts/selfcheck.py  offline checks; no network, no credentials
+  house-rules/          your tree's conventions (see below)
+  references/dates.md   Gramps date integer codes
+```
+
+`api.py` is the only way in and out:
+
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+scripts/api.py GET  people/ -p page=1 -p pagesize=10
+scripts/api.py GET  people/{handle} -p profile=self,events -p keys=profile
+scripts/api.py POST media/ -f scan.pdf
+scripts/api.py PUT  people/{handle} -b @person.json
+```
 
-# Install dependencies
+For browsing the API, use `jq` against the spec your own instance publishes:
+
+```bash
+jq -r '.paths | keys[]' $(scripts/spec.py --file)
+```
+
+`spec.py` handles only what `jq` is bad at -- Gramps schemas are mutually
+recursive, so inlining `Person` naively produces 59 KB where a summary is 2 KB.
+
+## House rules
+
+Every tree has conventions that exist nowhere in Gramps or its API: how notes
+are worded, how media are named, which fields are deliberately empty. Records
+that ignore them are valid and visibly wrong, and nothing errors.
+
+`house-rules/README.md` explains how to derive them from your own data by
+counting, so a rule carries its evidence. The derived rules describe your
+family tree rather than this software, so they are gitignored -- only the
+mechanism ships.
+
+## Development
+
+```bash
 uv sync
+uv run pre-commit install
+python3 skills/gramps/scripts/selfcheck.py
 ```
 
-2. **Run the Server**:
-```bash
-# HTTP transport (for web-based MCP clients)
-uv run python -m src.gramps_mcp.server
+`selfcheck.py` covers the logic that is not just HTTP -- JWT expiry, recursive
+schema resolution, path walking. It needs no network and no credentials.
 
-# Stdio transport (for CLI-based MCP clients)
-uv run python -m src.gramps_mcp.server stdio
-```
+Two rules worth keeping:
 
-The HTTP server will be available at `http://localhost:8000/mcp`, while stdio runs directly in the terminal.
+- **The scripts stay standard-library only.** A dependency is a thing that has
+  to be installed wherever the skill runs.
+- **Do not vendor upstream documentation.** Link to it. A checked-in copy goes
+  stale without telling you, and may not be yours to redistribute.
 
-### Environment Configuration
+## Licence
 
-Create a `.env` file with your Gramps Web settings:
+MIT. See [LICENSE](LICENSE).
 
-```bash
-# Your Gramps Web instance (from step 1)
-GRAMPS_API_URL=https://your-gramps-web-domain.com  # Without /api suffix - will be added automatically
-GRAMPS_USERNAME=your-gramps-web-username
-GRAMPS_PASSWORD=your-gramps-web-password
-GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
-```
-
-## MCP Client Configuration
-
-### Claude Desktop
-
-Add to your Claude Desktop MCP configuration file (`claude_desktop_config.json`):
-
-**Using Docker** (works with both pre-built and local images):
-```json
-{
-  "mcpServers": {
-    "gramps": {
-      "command": "docker",
-      "args": ["exec", "-i", "gramps-mcp-gramps-mcp-1", "python", "-m", "src.gramps_mcp.server", "stdio"]
-    }
-  }
-}
-```
-
-**Using uv directly** (if running without Docker):
-```json
-{
-  "mcpServers": {
-    "gramps": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "src.gramps_mcp.server", "stdio"],
-      "cwd": "/path/to/gramps-mcp"
-    }
-  }
-}
-```
-
-### OpenWebUI
-
-OpenWebUI recommends using the [mcpo proxy](https://docs.openwebui.com/openapi-servers/mcp/) to expose MCP servers as OpenAPI endpoints.
-
-**With uv:**
-```bash
-uvx mcpo --port 8000 -- uv run python -m src.gramps_mcp.server stdio
-```
-
-**With Docker:**
-```bash
-uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 uv run python -m src.gramps_mcp.server stdio
-```
-
-### Claude Code
-
-**HTTP Transport:**
-```bash
-claude mcp add --transport http gramps http://localhost:8000/mcp
-```
-
-**Stdio Transport** (direct connection, more efficient):
-```bash
-# Using Docker
-claude mcp add --transport stdio gramps "docker exec -i gramps-mcp-gramps-mcp-1 sh -c 'cd /app && python -m src.gramps_mcp.server stdio'"
-
-# Using uv directly (requires local setup)
-claude mcp add --transport stdio gramps "uv run python -m src.gramps_mcp.server stdio"
-```
-
-> **Transport Choice:** Use **stdio** for better performance and direct integration with CLI tools like Claude Code. Use **HTTP** when you need the server to handle multiple clients or prefer web-based access.
-
-### Other MCP Clients
-
-For any other MCP client, use the HTTP transport endpoint:
-
-```json
-{
-  "mcpServers": {
-    "gramps": {
-      "url": "http://localhost:8000/mcp"
-    }
-  }
-}
-```
-
-## Architecture
-
-### Core Components
-
-```
-src/gramps_mcp/
-|-- server.py           # MCP server with HTTP transport
-|-- tools.py            # Tool registry and exports
-|-- client.py           # Gramps Web API client
-|-- models.py           # Pydantic data models
-|-- auth.py             # JWT authentication
-|-- config.py           # Configuration management
-|-- tools/              # Modular tool implementations
-|   |-- search_basic.py
-|   |-- search_details.py
-|   |-- data_management.py
-|   |-- tree_management.py
-|   `-- analysis.py
-|-- handlers/           # Data formatting handlers
-`-- client/             # API client modules
-```
-
-### Technology Stack
-
-- **MCP Python SDK**: Model Context Protocol implementation
-- **FastAPI**: HTTP server for MCP transport
-- **Pydantic**: Data validation and serialization
-- **httpx**: Async HTTP client for API communication
-- **PyJWT**: JWT token authentication
-- **python-dotenv**: Environment configuration
-
-
-## Usage Examples
-
-### Basic Search Operations
-
-```txt
-Find all people with the surname "Smith" born in Ireland
-```
-
-```txt
-Show me recent changes to the family tree in the last 30 days
-```
-
-### Data Creation and Updates
-
-```txt
-Create a new person record for Patrick O'Brien, born 1845 in Cork, Ireland
-```
-
-```txt
-Add a marriage event for John and Mary Smith on June 15, 1870 in Boston
-```
-
-### Genealogy Analysis
-
-```txt
-Find all descendants of Margaret Kelly and show their birth locations
-```
-
-
-### Tree Information & Statistics
-
-```txt
-Show me statistics about my family tree - how many people, families, and events
-```
-
-```txt
-What recent changes have been made to my family tree in the last week?
-```
-
-## Security
-
-- JWT token authentication with automatic refresh
-- Environment-based credential management
-- Input validation using Pydantic models
-- Secure HTTP transport with proper error handling
-- No sensitive data exposed in tool responses
-
-
-## Troubleshooting
-
-### Common Issues
-
-**Connection refused errors**: Ensure your Gramps Web API server is running and accessible at the configured URL.
-
-**Authentication failures**: Verify your username and password are correct and the user has appropriate permissions.
-
-**Tool timeout errors**: Check your network connection and consider increasing timeout values for large datasets.
-
-**Docker issues**: Ensure Docker and Docker Compose are installed and running.
-
-### Debug Mode
-
-To enable debug logging, check your application logs with:
-
-```bash
-docker-compose logs -f
-```
-
-## License
-
-This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Related Projects
-
-- [Gramps](https://gramps-project.org/) - Free genealogy software
-- [Gramps Web API](https://github.com/gramps-project/gramps-web-api) - Web API for Gramps
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Standard for AI tool integration
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-
-- Setting up the development environment
-- Running tests and maintaining code quality
-- Submitting pull requests
-- Reporting issues and requesting features
-
-### Community & Support
-
-- **Bug Reports & Feature Requests**: [GitHub Issues](https://github.com/cabout/gramps-mcp/issues)
-- **Questions & Discussions**: [GitHub Discussions](https://github.com/cabout/gramps-mcp/discussions)
-- **Documentation**: [Project Wiki](https://github.com/cabout/gramps-mcp/wiki)
-
-## Acknowledgments
-
-- The Gramps Project team for creating excellent genealogy software
-- Anthropic for developing the Model Context Protocol
-- The genealogy research community for inspiration and feedback
+Earlier versions were AGPL-3.0; `v1.1.0` is the last release under it and the
+last with the MCP server.

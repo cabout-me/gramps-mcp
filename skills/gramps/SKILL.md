@@ -128,16 +128,35 @@ drop noisy ones, `extend=` to inline referenced objects (expensive -- reach for
 
 ## Searching
 
-- `-p 'gql=...'` filters structurally. Nested paths need `any` or `all`:
-  `primary_name.surname_list.any.surname ~ Dobrzy`. Operators: `=`, `~`
-  (contains), `!~`, `>`, `<`. Full property list and examples in
-  `references/gql.md` -- **check it for the path shape before composing a
-  query**, since a wrong path returns an error rather than a guess.
-- `GET search/ -p query=...` matches text anywhere, including inside notes.
+Two mechanisms, for different questions.
 
-Search results are wrapped: each item is
-`{"object_type": "person", "object": {...}}`, unlike list endpoints which
-return the objects directly.
+**`-p 'gql=...'` filters on structure** -- use it when you know the field. A
+query is one or more `field operator value` tests joined with `and` / `or`, with
+parentheses where needed. Operators: `=`, `!=`, `~` (contains), `!~`, `>`, `<`.
+
+Reaching into a list needs `any` or `all` at the point where the list is
+indexed, and following a handle to another object needs a `get_*` step:
+
+```bash
+scripts/api.py GET people/ -p 'gql=primary_name.surname_list.any.surname ~ Dobrzy' \
+                           -p page=1 -p pagesize=10
+scripts/api.py GET events/ -p 'gql=place.get_place.name.value ~ Vrasene' \
+                           -p page=1 -p pagesize=10
+```
+
+Quote values containing spaces or punctuation, or the parser stops at the first
+odd character and returns a 422 pointing at the column.
+
+**The full property list is on the instance's own docs site** --
+<https://www.grampsweb.org/user-guide/gql/>. Read it there rather than guessing
+a path: a wrong path is an error, not a near miss, and property names rarely
+match the field names you see in a response. It is not part of `openapi.json`,
+so nothing local can tell you.
+
+**`GET search/ -p query=...` matches text anywhere**, notes included. Use it
+when you know a phrase but not a field. Its results are wrapped differently --
+each item is `{"object_type": "person", "object": {...}}` rather than the object
+itself.
 
 ## Writing
 
