@@ -1,5 +1,17 @@
 # Concept: one tool, scripts, and a skill
 
+> **Superseded.** What was built is in `skills/gramps/` -- a skill and scripts,
+> with **no MCP server at all**. The scripts hold the credential and call the
+> API directly, which works because this runs in a harness that already has it.
+>
+> The reasoning below still holds; only the last layer went. Two findings
+> removed the argument for keeping a server: Gramps Web ships its own read-only
+> assistant (v3.6.0+), so the chat-interface case that justified an MCP is
+> covered upstream, and every instance publishes `/api/openapi.json`
+> unauthenticated, so "point at the live spec" needs no server either.
+>
+> Kept as the record of how the design got there.
+
 ## The principle
 
 **This repo only contains what the Gramps Web API can't do for itself.**

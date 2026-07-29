@@ -7,3 +7,9 @@ __pycache__
 .pytest_cache
 .env
 .claude/
+.pi/
+
+# House rules describe a specific family tree, not the skill. The mechanism
+# (README.md) ships; the observations about someone's own tree do not.
+skills/*/house-rules/*
+!skills/*/house-rules/README.md
