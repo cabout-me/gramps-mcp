@@ -108,13 +108,26 @@ async def get_type_tool(arguments: Dict) -> List[TextContent]:
             {"type": entity_type, "gql": f'gramps_id="{gramps_id}"', "max_results": 1}
         )
 
-        # Extract handle from search result
+        # Extract handle from search result.
+        # The formatted identity line looks like:
+        #   "[Unknown] Berry (M) - I0089 - [1034b42418c65209fb87d0d52d4c]"
+        # A naive first-"[...]" match grabs bracketed name tokens such as
+        # "[Unknown]" instead of the handle, producing a bogus handle and a
+        # "Record not found" error. Gramps handles are long hex strings, so
+        # match those specifically; fall back to the last bracketed token on
+        # the first result block (the format always ends the identity line
+        # with the handle).
         search_text = search_result[0].text
         import re
 
-        handle_match = re.search(r"\[([^\]]+)\]", search_text)
-        if handle_match:
-            handle = handle_match.group(1)
+        handle_matches = re.findall(r"\[([0-9a-fA-F]{16,})\]", search_text)
+        if handle_matches:
+            handle = handle_matches[0]
+        else:
+            first_block = search_text.split("\n\n")[0]
+            generic = re.findall(r"\[([^\]]+)\]", first_block)
+            if generic:
+                handle = generic[-1]
 
     if entity_type == "person" and handle:
         return await get_person_tool({"person_handle": handle})

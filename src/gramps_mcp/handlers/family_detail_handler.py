@@ -213,9 +213,16 @@ async def format_family_detail(client, tree_id: str, handle: str) -> str:
                     ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
                 )
                 note_type = note_data.get("type", "")
+                if isinstance(note_type, dict):
+                    note_type = note_type.get("string", "")
                 note_id = note_data.get("gramps_id", "")
-                note_text = note_data.get("text", "")[:50]  # First 50 chars
-                if len(note_data.get("text", "")) > 50:
+                # note "text" is a StyledText dict ({"string": ...}); slicing the
+                # dict raises "unhashable type: 'slice'". Extract the string.
+                raw_text = note_data.get("text", "")
+                if isinstance(raw_text, dict):
+                    raw_text = raw_text.get("string", "")
+                note_text = raw_text[:50]  # First 50 chars
+                if len(raw_text) > 50:
                     note_text += "..."
                 result += f"- {note_type}: {note_text} ({note_id})\n"
             except Exception:

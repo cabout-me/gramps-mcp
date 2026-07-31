@@ -280,9 +280,18 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
             ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
         )
         note_type = note_data.get("type", "")
+        if isinstance(note_type, dict):
+            note_type = note_type.get("string", "")
         note_id = note_data.get("gramps_id", "")
-        note_text = note_data.get("text", "")[:50]
-        if len(note_data.get("text", "")) > 50:
+        # A note's "text" comes back as a Gramps StyledText dict
+        # ({"_class": "StyledText", "string": ...}), not a plain string.
+        # Slicing the dict directly raises "unhashable type: 'slice'", which
+        # crashed get_type for any person/family that had an attached note.
+        raw_text = note_data.get("text", "")
+        if isinstance(raw_text, dict):
+            raw_text = raw_text.get("string", "")
+        note_text = raw_text[:50]
+        if len(raw_text) > 50:
             note_text += "..."
         result += f"- {note_type}: {note_text} ({note_id})\n"
 

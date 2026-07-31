@@ -26,7 +26,7 @@ API calls supported in this category:
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
 
@@ -66,6 +66,25 @@ class NoteSaveParams(BaseModel):
     )
     text: str = Field(..., description="Note text content")
     type: str = Field(..., description="The type of note")
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def _normalize_text(cls, v: Any) -> Any:
+        """Accept either a plain string or a Gramps StyledText dict.
+
+        ``model_dump`` below converts the plain string into a StyledText dict
+        (``{"_class": "StyledText", "string": ...}``) for the API. The FastMCP
+        dispatch layer validates the tool arguments into this model and then
+        calls ``model_dump()`` before handing the dict to the tool handler,
+        which re-validates it against this same model. Without this normalizer
+        that round-trip (validate -> model_dump -> validate) feeds a dict back
+        into the ``str`` ``text`` field and raises a validation error, breaking
+        every create_note / update_note call. Extracting ``string`` here makes
+        the round-trip idempotent.
+        """
+        if isinstance(v, dict):
+            return v.get("string", "")
+        return v
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Convert to API format with StyledText structure."""
