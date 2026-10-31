@@ -198,3 +198,26 @@ async def test_get_family_tool():
             pytest.skip("Family F0001 not found in search results")
     else:
         pytest.skip("Family F0001 not found in tree")
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("obj_type", ["person", "family"])
+async def test_get_type_with_attached_note(obj_type):
+    """get_type shows the note text for records that have notes (read-only)."""
+    search_result = await find_type_tool({
+        "type": obj_type,
+        "gql": "note_list.length>0",
+        "max_results": 1,
+    })
+    search_text = search_result[0].text
+    id_match = re.search(r" - ([A-Z]\d+) - \[", search_text)
+    if not id_match:
+        pytest.skip(f"No {obj_type} with notes in this tree")
+
+    result = await get_type_tool({"type": obj_type, "gramps_id": id_match.group(1)})
+    text = result[0].text
+
+    assert "Unexpected error" not in text, text
+    assert "Attached notes:" in text
+    notes_section = text.split("Attached notes:")[1]
+    # Reason: the old code showed "Note (<handle>)" for families when it failed.
+    assert re.search(r"- \S.*\(N\d+\)", notes_section), notes_section
