@@ -19,6 +19,7 @@ Person detail handler for Gramps MCP operations.
 """
 
 from ..models.api_calls import ApiCalls
+from ..utils import format_note_preview
 from .date_handler import format_date
 from .place_handler import format_place
 
@@ -281,9 +282,7 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
         )
         note_type = note_data.get("type", "")
         note_id = note_data.get("gramps_id", "")
-        note_text = note_data.get("text", "")[:50]
-        if len(note_data.get("text", "")) > 50:
-            note_text += "..."
+        note_text = format_note_preview(note_data)
         result += f"- {note_type}: {note_text} ({note_id})\n"
 
     return result

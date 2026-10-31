@@ -7,7 +7,11 @@ from dotenv import load_dotenv
 
 from src.gramps_mcp.client import GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
-from src.gramps_mcp.utils import get_gramps_id_from_handle, html_to_markdown
+from src.gramps_mcp.utils import (
+    format_note_preview,
+    get_gramps_id_from_handle,
+    html_to_markdown,
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,3 +47,29 @@ class TestGetGrampsIdFromHandle:
         
         finally:
             await client.close()
+
+class TestFormatNotePreview:
+    """Test the short note preview used in person and family details."""
+
+    def test_styled_text_dict(self):
+        """Gramps Web returns note text as a StyledText dict."""
+        note = {"text": {"_class": "StyledText", "string": "Short note", "tags": []}}
+        assert format_note_preview(note) == "Short note"
+
+    def test_styled_text_dict_truncated(self):
+        """Long StyledText notes are cut to the limit with an ellipsis."""
+        note = {"text": {"string": "x" * 60, "tags": []}}
+        assert format_note_preview(note) == "x" * 50 + "..."
+
+    def test_plain_string(self):
+        """A plain string text is still handled."""
+        assert format_note_preview({"text": "plain"}) == "plain"
+
+    def test_missing_text(self):
+        """A note without text gives an empty preview."""
+        assert format_note_preview({}) == ""
+
+    def test_custom_limit(self):
+        """The preview length can be changed."""
+        note = {"text": {"string": "abcdef"}}
+        assert format_note_preview(note, limit=3) == "abc..."

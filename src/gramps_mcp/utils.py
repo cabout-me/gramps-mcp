@@ -23,6 +23,26 @@ from markdownify import markdownify as md
 from .models.api_calls import ApiCalls
 
 
+def format_note_preview(note_data: dict, limit: int = 50) -> str:
+    """
+    Build a short one-line preview of a note's text.
+
+    Args:
+        note_data (dict): Note object from the Gramps Web API.
+        limit (int): Maximum number of characters before "..." is added.
+
+    Returns:
+        str: The first `limit` characters of the note text.
+    """
+    raw = note_data.get("text", "")
+    # Reason: Gramps Web returns note text as a StyledText dict
+    # ({"string": ..., "tags": [...]}), not a plain string.
+    text = raw.get("string", "") if isinstance(raw, dict) else str(raw or "")
+    if len(text) > limit:
+        return text[:limit] + "..."
+    return text
+
+
 def html_to_markdown(html: str) -> str:
     """
     Convert HTML content to Markdown format.
